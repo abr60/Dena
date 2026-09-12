@@ -1,0 +1,427 @@
+package com.dena.ui.screens
+
+import android.app.DatePickerDialog
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dena.R
+import com.dena.core.DenaPreferences
+import com.dena.core.StatementExport
+import com.dena.core.formatCurrencyRaw
+import com.dena.core.formatRelativeDate
+import com.dena.core.formatSigned
+import com.dena.data.transaction.Transaction
+import com.dena.ui.DebtViewModel
+import com.dena.ui.theme.LocalMoneyPalette
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DebtDetailScreen(
+    debtId: Long,
+    viewModel: DebtViewModel,
+    onBack: () -> Unit,
+) {
+    val owedToMeList by viewModel.owedToMe.collectAsStateWithLifecycle()
+    val iOweList by viewModel.iOwe.collectAsStateWithLifecycle()
+    val debt = (owedToMeList + iOweList).find { it.id == debtId }
+
+    val transactions by viewModel.getTransactionsForDebt(debtId).collectAsStateWithLifecycle(initialValue = emptyList())
+
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showPaymentModal by remember { mutableStateOf(false) }
+    var showExportSheet by remember { mutableStateOf(false) }
+    var paymentIsAddMore by remember { mutableStateOf(false) }
+
+    if (debt == null) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopAppBar(
+                title = { Text(stringResource(R.string.detail)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+            Box(modifier = Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.debt_not_found), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+
+    val isOwedToMe = debt.direction == "owed_to_me"
+    val prefs = DenaPreferences(LocalContext.current)
+    val sym = prefs.getCurrencySymbol()
+    val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text(debt.contactName) },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                val ctx = LocalContext.current
+                IconButton(onClick = { showExportSheet = true }) {
+                    Icon(Icons.Filled.Share, contentDescription = "Export")
+                }
+                IconButton(onClick = { showDeleteConfirm = true }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // B. Summary card — monochrome shell, only history keeps red/green
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+                shape = RoundedCornerShape(16.dp),
+                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 0.dp),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                ) {
+                    val isOverpaid = debt.remainingBalance < 0
+                    val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
+                    val settled = debt.principalAmount - debt.remainingBalance
+                    Text(
+                        text = if (isOverpaid) "Overpaid: ${formatCurrencyRaw(kotlin.math.abs(debt.remainingBalance), sym, showDecimals)}" else "Remaining: ${formatSigned(debt.remainingBalance, sym, negative = !isOwedToMe && !isOverpaid, showDecimals = showDecimals)}",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "Total: ${formatCurrencyRaw(debt.principalAmount, sym, showDecimals)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Settled: ${formatCurrencyRaw(settled, sym, showDecimals)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Opened: ${formatRelativeDate(debt.dateOpened)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = if (debt.dueDate != null) "Due: ${formatRelativeDate(debt.dueDate!!)}" else stringResource(R.string.no_due_date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (debt.notes.isNotBlank()) {
+                        Text(
+                            text = debt.notes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                }
+            }
+
+            // C. Balanced action buttons — same hierarchy, distinct semantics
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = { paymentIsAddMore = false; showPaymentModal = true },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("\u2212 Log Payment", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold))
+                }
+                Button(
+                    onClick = { paymentIsAddMore = true; showPaymentModal = true },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(if (isOwedToMe) "+ Lend More" else "+ Borrow More", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold))
+                }
+            }
+
+            // D. Transaction history section
+            Text(
+                text = "History",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (transactions.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No transactions yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    transactions.forEach { tx ->
+                        TransactionRow(transaction = tx, debtDirection = debt.direction)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.delete_debt)) },
+            text = { Text(stringResource(R.string.delete_confirm)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteDebt(debt)
+                        showDeleteConfirm = false
+                        onBack()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+
+    if (showPaymentModal) {
+        PaymentModal(
+            isAddMore = paymentIsAddMore,
+            isOwedToMe = isOwedToMe,
+            onDismiss = { showPaymentModal = false },
+            onSave = { amount, note, ts ->
+                if (paymentIsAddMore) viewModel.addMoreDebt(debtId, amount, note, ts)
+                else viewModel.recordPayment(debtId, amount, note, ts)
+                showPaymentModal = false
+            },
+        )
+    }
+
+    if (showExportSheet) {
+        ModalBottomSheet(onDismissRequest = { showExportSheet = false }) {
+            val ctx = LocalContext.current
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Export Statement", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                OutlinedButton(
+                    onClick = { StatementExport.exportPdf(ctx, debt, transactions); showExportSheet = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) { Text("Export as PDF") }
+                OutlinedButton(
+                    onClick = { StatementExport.exportCsv(ctx, debt, transactions); showExportSheet = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) { Text("Export as CSV") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionRow(
+    transaction: Transaction,
+    debtDirection: String,
+) {
+    val context = LocalContext.current
+    val prefs = DenaPreferences(context)
+    val currencySymbol = prefs.getCurrencySymbol()
+    val isDebtAdded = transaction.direction == "debt_added"
+    val label = when (transaction.direction) {
+        "debt_added" -> "Debt added"
+        "payment_received" -> "Payment received"
+        "payment_made" -> "Payment made"
+        else -> transaction.direction
+    }
+    val sign = if (isDebtAdded) "+" else "\u2212"
+    val amountColor = if (isDebtAdded) Color(0xFF4CAF50) else Color(0xFFF44336)
+    val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (transaction.note.isNotBlank()) {
+                    Text(
+                        text = transaction.note,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
+                val raw = formatCurrencyRaw(transaction.amount, currencySymbol, showDecimals)
+                val moneyPalette = LocalMoneyPalette.current
+                val amountColor = if (isDebtAdded) moneyPalette.positive else moneyPalette.negative
+                Text(
+                    text = if (isDebtAdded) "+ $raw" else "− $raw",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = amountColor,
+                )
+                Text(
+                    text = dateFormat.format(transaction.timestamp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PaymentModal(
+    isAddMore: Boolean,
+    isOwedToMe: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (Double, String, Long) -> Unit,
+) {
+    var amountText by remember { mutableStateOf("") }
+    var noteText by remember { mutableStateOf("") }
+    var txDate by remember { mutableStateOf(System.currentTimeMillis()) }
+    val context = LocalContext.current
+    val df = SimpleDateFormat("MMM d, yyyy", Locale.US)
+    fun pick() {
+        val cal = Calendar.getInstance().apply { timeInMillis = txDate }
+        DatePickerDialog(context, { _, y, m, d ->
+            val c = Calendar.getInstance().apply { set(y, m, d, 12, 0, 0); set(Calendar.MILLISECOND, 0) }
+            txDate = c.timeInMillis
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
+    val title = if (isAddMore) (if (isOwedToMe) "Lend More" else "Borrow More") else "Log Payment"
+    val amountLabel = if (isAddMore) (if (isOwedToMe) "Amount to lend" else "Amount to borrow") else "Amount to log"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = {
+                        if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                            amountText = it
+                        }
+                    },
+                    label = { Text(amountLabel) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text(stringResource(R.string.note_optional)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = df.format(txDate),
+                    onValueChange = {},
+                    label = { Text("Date") },
+                    leadingIcon = { Icon(Icons.Filled.DateRange, null) },
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth().clickable { pick() },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = amountText.toDoubleOrNull() ?: 0.0
+                    if (amount > 0) onSave(amount, noteText, txDate)
+                },
+                enabled = (amountText.toDoubleOrNull() ?: 0.0) > 0,
+            ) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}

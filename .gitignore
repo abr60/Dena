@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+app/build/
+.kotlin/
+
+# Logs
+*.log
+build.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.fleet/
+captures/
+
+# Local config
+local.properties
+keystore.properties
+
+# Signing keys — never commit
+*.jks
+*.keystore
+*release.keystore
+
+# Native build cache
+.externalNativeBuild/
+.cxx/
+
+# OS
+.DS_Store
+Thumbs.db
