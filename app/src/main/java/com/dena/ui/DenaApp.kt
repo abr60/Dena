@@ -106,6 +106,7 @@ fun DenaApp(database: DenaDatabase) {
     var themeMode by rememberSaveable { mutableStateOf(prefs.getThemeMode()) }
     var paletteId by rememberSaveable { mutableStateOf(prefs.getPaletteId()) }
     var paletteEnabled by rememberSaveable { mutableStateOf(prefs.isPaletteEnabled()) }
+    var fontSize by rememberSaveable { mutableStateOf(prefs.getFontSize()) }
 
     // Floating action button only on main tabs (not settings)
     val showFab = selectedTab < 2
@@ -126,7 +127,8 @@ fun DenaApp(database: DenaDatabase) {
 
     com.dena.ui.theme.DenaTheme(
         themeMode = themeMode,
-        palette = if (themeMode != DenaThemeMode.DYNAMIC && paletteEnabled) PaletteRegistry.find(paletteId) else null
+        palette = if (themeMode != DenaThemeMode.DYNAMIC && paletteEnabled) PaletteRegistry.find(paletteId) else null,
+        fontSize = fontSize
     ) {
         Scaffold(
             bottomBar = {
@@ -154,7 +156,7 @@ fun DenaApp(database: DenaDatabase) {
                                     Text(
                                         destination.label,
                                         fontWeight = if (selectedTab == index) {
-                                            androidx.compose.ui.text.font.FontWeight.Bold
+                                            androidx.compose.ui.text.font.FontWeight.SemiBold
                                         } else {
                                             androidx.compose.ui.text.font.FontWeight.Normal
                                         },
@@ -232,6 +234,11 @@ fun DenaApp(database: DenaDatabase) {
                                         onPaletteEnabledChange = { enabled ->
                                             paletteEnabled = enabled
                                             prefs.setPaletteEnabled(enabled)
+                                        },
+                                        fontSize = fontSize,
+                                        onFontSizeChange = { newSize ->
+                                            fontSize = newSize
+                                            prefs.setFontSize(newSize)
                                         },
                                         database = database,
                                     )

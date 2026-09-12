@@ -80,6 +80,7 @@ fun DebtDetailScreen(
     var showPaymentModal by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
     var paymentIsAddMore by remember { mutableStateOf(false) }
+    var editingTx by remember { mutableStateOf<Transaction?>(null) }
 
     if (debt == null) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -146,7 +147,7 @@ fun DebtDetailScreen(
                     val settled = debt.principalAmount - debt.remainingBalance
                     Text(
                         text = if (isOverpaid) "Overpaid: ${formatCurrencyRaw(kotlin.math.abs(debt.remainingBalance), sym, showDecimals)}" else "Remaining: ${formatSigned(debt.remainingBalance, sym, negative = !isOwedToMe && !isOverpaid, showDecimals = showDecimals)}",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
@@ -224,7 +225,11 @@ fun DebtDetailScreen(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     transactions.forEach { tx ->
-                        TransactionRow(transaction = tx, debtDirection = debt.direction)
+                        TransactionRow(
+                            transaction = tx,
+                            debtDirection = debt.direction,
+                            onClick = { editingTx = tx }
+                        )
                     }
                 }
             }
@@ -286,12 +291,29 @@ fun DebtDetailScreen(
             }
         }
     }
+
+    editingTx?.let { tx ->
+        EditTransactionDialog(
+            transaction = tx,
+            debtDirection = debt.direction,
+            onDismiss = { editingTx = null },
+            onSave = { updated ->
+                viewModel.updateTransaction(updated)
+                editingTx = null
+            },
+            onDelete = {
+                viewModel.deleteTransaction(tx)
+                editingTx = null
+            }
+        )
+    }
 }
 
 @Composable
 private fun TransactionRow(
     transaction: Transaction,
     debtDirection: String,
+    onClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val prefs = DenaPreferences(context)
@@ -304,11 +326,11 @@ private fun TransactionRow(
         else -> transaction.direction
     }
     val sign = if (isDebtAdded) "+" else "\u2212"
-    val amountColor = if (isDebtAdded) Color(0xFF4CAF50) else Color(0xFFF44336)
+    val amountColor = if (isDebtAdded) Color(0xFF81C784) else Color(0xFFE57373)
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = androidx.compose.material3.CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
@@ -341,7 +363,7 @@ private fun TransactionRow(
                 Text(
                     text = if (isDebtAdded) "+ $raw" else "− $raw",
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = amountColor,
                 )
                 Text(
@@ -351,6 +373,101 @@ private fun TransactionRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun EditTransactionDialog(
+    transaction: Transaction,
+    debtDirection: String,
+    onDismiss: () -> Unit,
+    onSave: (Transaction) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var amountText by remember { mutableStateOf(transaction.amount.toString().let { if (it.endsWith(".0")) it.dropLast(2) else it }) }
+    var noteText by remember { mutableStateOf(transaction.note) }
+    var txDate by remember { mutableStateOf(transaction.timestamp) }
+    var txDirection by remember { mutableStateOf(transaction.direction) }
+    val context = LocalContext.current
+    val df = SimpleDateFormat("MMM d, yyyy", Locale.US)
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    fun pick() {
+        val cal = Calendar.getInstance().apply { timeInMillis = txDate }
+        DatePickerDialog(context, { _, y, m, d ->
+            val c = Calendar.getInstance().apply { set(y, m, d, 12, 0, 0); set(Calendar.MILLISECOND, 0) }
+            txDate = c.timeInMillis
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+    }
+    val typeOptions = if (debtDirection == "owed_to_me") listOf("Debt added", "Payment received") else listOf("Debt added", "Payment made")
+    val dirValues = if (debtDirection == "owed_to_me") listOf("debt_added", "payment_received") else listOf("debt_added", "payment_made")
+    val selectedIdx = dirValues.indexOf(txDirection).coerceAtLeast(0)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit entry") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    dirValues.forEachIndexed { idx, _ ->
+                        val sel = idx == selectedIdx
+                        OutlinedButton(
+                            onClick = { txDirection = dirValues[idx] },
+                            modifier = Modifier.weight(1f),
+                            colors = if (sel) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
+                        ) { Text(typeOptions[idx], fontSize = 12.sp) }
+                    }
+                }
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) amountText = it },
+                    label = { Text("Amount") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text(stringResource(R.string.note_optional)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = df.format(txDate),
+                    onValueChange = {},
+                    label = { Text("Date") },
+                    leadingIcon = { Icon(Icons.Filled.DateRange, null) },
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth().clickable { pick() },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = amountText.toDoubleOrNull() ?: 0.0
+                    if (amount > 0) onSave(transaction.copy(amount = amount, note = noteText, timestamp = txDate, direction = txDirection))
+                },
+                enabled = (amountText.toDoubleOrNull() ?: 0.0) > 0,
+            ) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { showDeleteConfirm = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            }
+        },
+    )
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete entry?") },
+            text = { Text("This will remove this history entry and recalculate the balance.") },
+            confirmButton = {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) } }
+        )
     }
 }
 

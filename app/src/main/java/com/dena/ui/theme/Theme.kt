@@ -8,19 +8,22 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 import com.dena.core.ThemePalette
 import com.dena.core.PaletteTokens
 
 data class MoneyPalette(val positive: Color, val negative: Color)
-val LocalMoneyPalette = compositionLocalOf { MoneyPalette(Color(0xFF4CAF50), Color(0xFFF44336)) }
+val LocalMoneyPalette = compositionLocalOf { MoneyPalette(Color(0xFF81C784), Color(0xFFE57373)) }
 
 private fun contrastOn(c: Color): Color = if (c.luminance() < 0.5f) Color.White else Color(0xFF1A1A1A)
 
@@ -75,20 +78,27 @@ private val DenaLightScheme = lightColorScheme(
     background = Color(0xFFF5F5F5), onBackground = Color(0xFF1A1A1A),
     surface = Color(0xFFF0F0F0), onSurface = Color(0xFF1A1A1A),
     surfaceVariant = Color(0xFFE8E8E8), onSurfaceVariant = Color(0xFF888888),
-    outline = Color(0xFFD0D0D0), error = Color(0xFFF44336)
+    outline = Color(0xFFD0D0D0), error = Color(0xFFE57373)
 )
 private val DenaDarkScheme = darkColorScheme(
     primary = Color(0xFFF0F0F0), onPrimary = Color.Black,
     background = Color.Black, onBackground = Color(0xFFF0F0F0),
     surface = Color(0xFF0A0A0A), onSurface = Color(0xFFF0F0F0),
     surfaceVariant = Color(0xFF1A1A1A), onSurfaceVariant = Color(0xFF999999),
-    outline = Color(0xFF333333), error = Color(0xFFF44336)
+    outline = Color(0xFF333333), error = Color(0xFFE57373)
 )
+
+fun fontScaleFor(size: String): Float = when (size.lowercase()) {
+    "small" -> 0.85f
+    "large" -> 1.18f
+    else -> 1f
+}
 
 @Composable
 fun DenaTheme(
     themeMode: DenaThemeMode,
     palette: ThemePalette?,
+    fontSize: String = "medium",
     content: @Composable () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -117,7 +127,13 @@ fun DenaTheme(
         }
     }
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalMoneyPalette provides MoneyPalette(Color(0xFF4CAF50), Color(0xFFF44336))) {
-        MaterialTheme(colorScheme = colorScheme, content = content)
+    val baseDensity = LocalDensity.current
+    val scale = fontScaleFor(fontSize)
+    val scaledDensity = Density(baseDensity.density, baseDensity.fontScale * scale)
+
+    CompositionLocalProvider(LocalDensity provides scaledDensity) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalMoneyPalette provides MoneyPalette(Color(0xFF81C784), Color(0xFFE57373))) {
+            MaterialTheme(colorScheme = colorScheme, content = content)
+        }
     }
 }

@@ -56,7 +56,7 @@ fun CurrencyPickerDialog(
                         Text(
                             text = cur.symbol,
                             fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(end = 16.dp),
                         )
@@ -64,7 +64,7 @@ fun CurrencyPickerDialog(
                             Text(
                                 text = cur.code,
                                 fontSize = 16.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             )
                             Text(

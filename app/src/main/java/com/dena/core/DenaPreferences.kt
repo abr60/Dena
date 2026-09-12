@@ -22,6 +22,9 @@ class DenaPreferences(context: Context) {
     fun showDecimals(): Boolean = prefs.getBoolean(KEY_SHOW_DECIMALS, true)
     fun setShowDecimals(v: Boolean) { prefs.edit().putBoolean(KEY_SHOW_DECIMALS, v).apply() }
 
+    fun showPercentage(): Boolean = prefs.getBoolean(KEY_SHOW_PERCENTAGE, false)
+    fun setShowPercentage(v: Boolean) { prefs.edit().putBoolean(KEY_SHOW_PERCENTAGE, v).apply() }
+
     fun getThemeMode(): com.dena.ui.theme.DenaThemeMode {
         return try {
             com.dena.ui.theme.DenaThemeMode.valueOf(prefs.getString(KEY_THEME_MODE, com.dena.ui.theme.DenaThemeMode.SYSTEM.name) ?: com.dena.ui.theme.DenaThemeMode.SYSTEM.name)
@@ -52,6 +55,7 @@ class DenaPreferences(context: Context) {
         const val KEY_PALETTE = "palette_id"
         const val KEY_PALETTE_ENABLED = "palette_enabled"
         const val KEY_FONT_SIZE = "font_size"
+        const val KEY_SHOW_PERCENTAGE = "show_percentage"
         const val KEY_HISTORY_CLEAN_DAYS = "history_clean_days"
         const val KEY_UNLOCKED = "unlocked"
         const val LANG_EN = "en"

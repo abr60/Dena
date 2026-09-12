@@ -14,8 +14,8 @@ android {
         applicationId = "com.dena"
         minSdk = 33
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-alpha"
+        versionCode = 2
+        versionName = "0.2.0-alpha"
     }
 
     buildFeatures {
@@ -34,7 +34,17 @@ android {
 
     signingConfigs {
         create("release") {
-            val storeFilePath = file("dena-release.keystore")
+            // Centralized keystore: ~/.keystores/central-release.keystore (shared across all your apps)
+            // Each app uses its own alias (dena, talom, …) with same store password. Falls back to local file.
+            val centralPath = (project.findProperty("CENTRAL_RELEASE_STORE_FILE") as String?)
+                ?: System.getenv("CENTRAL_RELEASE_STORE_FILE")
+                ?: "${System.getProperty("user.home")}/.keystores/central-release.keystore"
+            val centralFile = file(centralPath)
+            val localFile = file("dena-release.keystore")
+            val storeFilePath = when {
+                centralFile.exists() -> centralFile
+                else -> localFile
+            }
             if (storeFilePath.exists()) {
                 storeFile = storeFilePath
                 storePassword = (project.findProperty("DENA_RELEASE_STORE_PASSWORD") as String?)

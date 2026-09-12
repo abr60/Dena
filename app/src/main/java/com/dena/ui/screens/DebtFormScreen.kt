@@ -12,20 +12,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,8 +48,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dena.R
+import com.dena.core.CurrencyRegistry
 import com.dena.core.DenaPreferences
 import com.dena.ui.DebtViewModel
+import com.dena.ui.components.CurrencyPickerDialog
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -67,7 +73,9 @@ fun DebtFormScreen(
     var dueDate by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
-    val symbol = prefs.getCurrencySymbol()
+    var currencyCode by remember { mutableStateOf(prefs.getCurrency()) }
+    var showCurrencyPicker by remember { mutableStateOf(false) }
+    val symbol = CurrencyRegistry.symbolFor(currencyCode)
 
     val dateFmt = SimpleDateFormat("MMM d, yyyy", Locale.US)
     val canSave = name.isNotBlank() && (amountText.toDoubleOrNull() ?: 0.0) > 0
@@ -133,75 +141,87 @@ fun DebtFormScreen(
                     Text("I Borrowed", fontSize = 14.sp)
                 }
             }
-            // Creation date — tappable
+            // Creation date — My Debts style: outlined chip, left-aligned
+            OutlinedButton(
+                onClick = { showDatePicker(creationDate) { creationDate = it } },
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.height(52.dp),
+            ) {
+                Icon(Icons.Filled.DateRange, null, modifier = Modifier.padding(end = 8.dp))
+                Text(dateFmt.format(Date(creationDate)))
+            }
             OutlinedTextField(
-                value = dateFmt.format(Date(creationDate)),
-                onValueChange = {},
-                label = { Text("Creation date") },
-                trailingIcon = { Icon(Icons.Filled.DateRange, null, modifier = Modifier.clickable { showDatePicker(creationDate) { creationDate = it } }) },
-                readOnly = true,
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.contact_name)) },
+                leadingIcon = { Icon(Icons.Filled.Person, null) },
+                trailingIcon = {
+                    IconButton(onClick = {
+                        permLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+                    }) {
+                        Icon(Icons.Filled.Person, contentDescription = "Pick contact")
+                    }
+                },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.contact_name)) },
-                    leadingIcon = { Icon(Icons.Filled.Person, null) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = {
-                    permLauncher.launch(android.Manifest.permission.READ_CONTACTS)
-                }) {
-                    Icon(Icons.Filled.Person, contentDescription = "Pick contact")
-                }
-            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) amountText = it },
                     label = { Text(stringResource(R.string.amount)) },
-                    leadingIcon = { Icon(Icons.Filled.Info, null) },
+                    leadingIcon = { Text(symbol, style = MaterialTheme.typography.titleMedium) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                Text(symbol, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 4.dp))
+                OutlinedButton(
+                    onClick = { showCurrencyPicker = true },
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.width(96.dp).height(56.dp),
+                ) { Text(currencyCode) }
             }
-            // Due date row: picker + checkbox
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = if (dueDate != null) dateFmt.format(Date(dueDate!!)) else "—",
-                    onValueChange = {},
-                    label = { Text("Due date") },
-                    leadingIcon = { Icon(Icons.Filled.DateRange, null) },
-                    readOnly = true,
-                    enabled = !noDueDate,
-                    modifier = Modifier.weight(1f).clickable(enabled = !noDueDate) {
-                        showDatePicker(dueDate ?: System.currentTimeMillis()) { picked -> dueDate = picked }
+            if (showCurrencyPicker) {
+                CurrencyPickerDialog(
+                    currentCode = currencyCode,
+                    onPick = { picked ->
+                        currencyCode = picked
+                        prefs.setCurrency(picked)
+                        showCurrencyPicker = false
                     },
+                    onDismiss = { showCurrencyPicker = false },
                 )
-                IconButton(onClick = {
-                    if (!noDueDate) showDatePicker(dueDate ?: System.currentTimeMillis()) { picked -> dueDate = picked }
-                }, enabled = !noDueDate) {
-                    Icon(Icons.Filled.DateRange, contentDescription = "Pick due date")
-                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Checkbox(checked = noDueDate, onCheckedChange = { checked ->
-                    noDueDate = checked
-                    if (checked) dueDate = null else if (dueDate == null) dueDate = System.currentTimeMillis()
-                })
-                Text(stringResource(R.string.no_due_date), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clickable { noDueDate = !noDueDate; if (!noDueDate && dueDate == null) dueDate = System.currentTimeMillis() })
+            // Due date row: chip (left) + No-due-date checkbox (right), like My Debts
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                OutlinedButton(
+                    onClick = { if (!noDueDate) showDatePicker(dueDate ?: System.currentTimeMillis()) { picked -> dueDate = picked } },
+                    enabled = !noDueDate,
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.height(52.dp),
+                ) {
+                    Icon(Icons.Filled.DateRange, null, modifier = Modifier.padding(end = 8.dp))
+                    Text(if (dueDate != null) dateFmt.format(Date(dueDate!!)) else "—")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                    noDueDate = !noDueDate
+                    if (!noDueDate && dueDate == null) dueDate = System.currentTimeMillis()
+                }) {
+                    Checkbox(checked = noDueDate, onCheckedChange = { checked ->
+                        noDueDate = checked
+                        if (checked) dueDate = null else if (dueDate == null) dueDate = System.currentTimeMillis()
+                    })
+                    Text(stringResource(R.string.no_due_date), style = MaterialTheme.typography.bodyMedium)
+                }
             }
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
                 label = { Text(stringResource(R.string.notes)) },
+                placeholder = { Text("debt comment") },
                 leadingIcon = { Icon(Icons.Filled.Info, null) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                minLines = 4,
             )
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
             Button(
@@ -211,7 +231,7 @@ fun DebtFormScreen(
                         contactName = name.trim(),
                         direction = if (isOwedToMe) "owed_to_me" else "i_owe",
                         amount = amount,
-                        currency = prefs.getCurrency(),
+                        currency = currencyCode,
                         category = "Other",
                         notes = notes.trim(),
                         dueDate = if (noDueDate) null else dueDate,
@@ -220,7 +240,7 @@ fun DebtFormScreen(
                     onBack()
                 },
                 enabled = canSave,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text(stringResource(R.string.save)) }
         }
     }

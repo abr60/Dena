@@ -51,6 +51,58 @@ class DebtRepository(
     suspend fun insertTransaction(tx: Transaction): Long = transactionDao.insert(tx)
     fun getTransactionsForDebt(debtId: Long): Flow<List<Transaction>> = transactionDao.getByDebtId(debtId)
 
+    suspend fun updateTransaction(tx: Transaction) = withContext(Dispatchers.IO) {
+        transactionDao.update(tx)
+        recalculateDebtBalance(tx.debtId)
+    }
+
+    suspend fun deleteTransaction(tx: Transaction) = withContext(Dispatchers.IO) {
+        transactionDao.delete(tx)
+        recalculateDebtBalance(tx.debtId)
+    }
+
+    suspend fun ensureInitialTransactions() = withContext(Dispatchers.IO) {
+        val debts = debtDao.getAllOnce()
+        for (debt in debts) {
+            val count = transactionDao.countInitialTransactions(debt.id, debt.creationDate)
+            if (count == 0) {
+                val initialTx = Transaction.create(
+                    debtId = debt.id,
+                    amount = debt.principalAmount,
+                    direction = "debt_added",
+                    note = debt.notes,
+                    timestamp = debt.creationDate
+                )
+                transactionDao.insert(initialTx)
+            }
+        }
+    }
+
+    suspend fun recalculateDebtBalance(debtId: Long) = withContext(Dispatchers.IO) {
+        val debt = debtDao.getById(debtId) ?: return@withContext
+        val transactions = transactionDao.getAllForDebtOnce(debtId)
+        
+        var newPrincipal = 0.0
+        var totalPayments = 0.0
+        
+        for (tx in transactions) {
+            if (tx.direction == "debt_added") {
+                newPrincipal += tx.amount
+            } else if (tx.direction == "payment_received" || tx.direction == "payment_made") {
+                totalPayments += tx.amount
+            }
+        }
+        
+        val newRemaining = newPrincipal - totalPayments
+        
+        val updatedDebt = debt.copy(
+            principalAmount = newPrincipal,
+            remainingBalance = newRemaining,
+            updatedAt = System.currentTimeMillis()
+        )
+        debtDao.update(updatedDebt)
+    }
+
     // Record payment: insert transaction + update debt remainingBalance (allows negative for overpayment)
     suspend fun recordPayment(debtId: Long, amount: Double, note: String, timestamp: Long = System.currentTimeMillis()): Boolean {
         val debt = debtDao.getById(debtId) ?: return false

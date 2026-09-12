@@ -51,7 +51,7 @@ fun SummaryBanner(
             Text(
                 text = amountText,
                 fontSize = 42.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.SemiBold,
                 lineHeight = 44.sp,
                 letterSpacing = (-0.5).sp,
                 color = MaterialTheme.colorScheme.onSurface,

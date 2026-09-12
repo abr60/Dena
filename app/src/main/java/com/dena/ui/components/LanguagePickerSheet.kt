@@ -56,7 +56,7 @@ fun LanguagePickerDialog(
                         Text(
                             text = lang.second,
                             fontSize = 16.sp,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                             color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                         )

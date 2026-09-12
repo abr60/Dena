@@ -56,6 +56,7 @@ fun DebtList(
     val context = LocalContext.current
     val prefs = DenaPreferences(context)
     val currencySymbol = prefs.getCurrencySymbol()
+    val showPercentage = prefs.showPercentage()
     val dateFmt = SimpleDateFormat("M/d/yy", Locale.US)
     // Filter by search
     val filtered = remember(debts, searchQuery) {
@@ -78,9 +79,9 @@ fun DebtList(
     grouped.forEach { (header, groupDebts) ->
         Text(
             text = header,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp),
+            modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
         )
         groupDebts.forEach { debt ->
             val isOverpaid = debt.remainingBalance < 0
@@ -89,7 +90,7 @@ fun DebtList(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 5.dp),
+                    .padding(vertical = 5.dp),
                 onClick = { onDebtClick(debt) },
                 colors = androidx.compose.material3.CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -110,14 +111,14 @@ fun DebtList(
                             .background(MaterialTheme.colorScheme.primary, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(letter.toString(), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                        Text(letter.toString(), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary)
                     }
                     Column(
                         modifier = Modifier.weight(1f).padding(start = 12.dp, end = 10.dp),
                     ) {
                         Text(
                             debt.contactName,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 16.sp),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium, fontSize = 16.sp),
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                         )
@@ -132,12 +133,14 @@ fun DebtList(
                         modifier = Modifier.width(112.dp),
                         horizontalAlignment = Alignment.End,
                     ) {
-                        Text(
-                            text = "$progress%",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
+                        if (showPercentage) {
+                            Text(
+                                text = "$progress%",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
                         // Use per-debt currency symbol if set, else passed symbol
                         val sym = if (debt.currency.isNotBlank()) CurrencyRegistry.symbolFor(debt.currency) else currencySymbol
                         val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
@@ -154,7 +157,7 @@ fun DebtList(
                         Text(
                             text = balText,
                             fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = balColor,
                             maxLines = 1,
                         )

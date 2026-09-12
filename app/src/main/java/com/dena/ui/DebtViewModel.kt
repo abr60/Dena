@@ -37,6 +37,7 @@ class DebtViewModel(
 
     init {
         observeData()
+        viewModelScope.launch { repository.ensureInitialTransactions() }
     }
 
     private fun observeData() {
@@ -87,8 +88,25 @@ class DebtViewModel(
                 notes = notes,
                 creationDate = creationDate,
             )
-            repository.insertDebt(debt)
+            val newId = repository.insertDebt(debt)
+            // Task 1: log initial debt as first transaction
+            val initialTx = Transaction.create(
+                debtId = newId,
+                amount = amount,
+                direction = "debt_added",
+                note = notes,
+                timestamp = creationDate
+            )
+            repository.insertTransaction(initialTx)
         }
+    }
+
+    fun updateTransaction(tx: Transaction) {
+        viewModelScope.launch { repository.updateTransaction(tx) }
+    }
+
+    fun deleteTransaction(tx: Transaction) {
+        viewModelScope.launch { repository.deleteTransaction(tx) }
     }
 
     fun deleteDebt(debt: Debt) {
