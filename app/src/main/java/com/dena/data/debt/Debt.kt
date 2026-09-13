@@ -19,6 +19,7 @@ data class Debt(
     val creationDate: Long = System.currentTimeMillis(), // Manually set date
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
+    val isClosed: Boolean = false, // true when fully paid (remainingBalance <= 0.005); auto-reopens on new debt
 ) {
     companion object {
         fun fromDomain(

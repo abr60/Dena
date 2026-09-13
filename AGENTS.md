@@ -18,6 +18,13 @@ Rules that preserve this:
 5. **`debugImplementation("androidx.compose.ui:ui-tooling-preview")`** — must stay `debugImplementation`, not `implementation`.
 6. Guard Dynamic Colors (Material You) with `Build.VERSION.SDK_INT >= S` in `SettingsScreen` — it crashes on API < 31.
 
+## Versioning (SemVer discipline)
+
+- **0.x until 1.0.0 is declared.** Stay on `0.*` (e.g. `0.6.0-alpha`) until the owner explicitly declares 1.0.0 feature-complete. Do not jump to 1.0.0 on your own.
+- **Format:** `MAJOR.MINOR.PATCH[-PRERELEASE]` (e.g. `0.6.0-alpha`). Tags are `vX.Y.Z[-PRERELEASE]` (e.g. `v0.6.0-alpha`).
+- **Rules:** `versionCode` strictly monotonic. One `CHANGELOG.md` entry per release (newest on top). Never skip a version or reuse a tag.
+- **Pre-release suffix:** keep `-alpha` until 1.0.0 unless the owner says otherwise.
+
 ## Release process
 
 - Keystore: `~/.keystores/central-release.keystore`, alias `dena` (env: `CENTRAL_RELEASE_STORE_FILE`, `DENA_RELEASE_KEY_ALIAS`, passwords via env/gradle props). Never commit `*.jks`/`*.keystore`, never mention keystore path/alias in release notes.

@@ -20,9 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import com.dena.R
 import com.dena.core.CurrencyRegistry
 import com.dena.core.DenaPreferences
 import com.dena.core.formatCurrencyRaw
@@ -52,6 +51,7 @@ fun DebtList(
     debts: List<Debt>,
     onDebtClick: (Debt) -> Unit,
     searchQuery: String = "",
+    closed: Boolean = false, // settled rows: greyed out, tappable to view/edit
 ) {
     val context = LocalContext.current
     val prefs = DenaPreferences(context)
@@ -84,13 +84,13 @@ fun DebtList(
             modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
         )
         groupDebts.forEach { debt ->
-            val isOverpaid = debt.remainingBalance < 0
             val isIOwe = debt.direction == "i_owe"
             val progress = if (debt.principalAmount > 0) ((debt.principalAmount - debt.remainingBalance) / debt.principalAmount * 100).toInt().coerceIn(0, 100) else 0
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 5.dp),
+                    .padding(vertical = 5.dp)
+                    .alpha(if (closed) 0.55f else 1f),
                 onClick = { onDebtClick(debt) },
                 colors = androidx.compose.material3.CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -150,19 +150,28 @@ fun DebtList(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )
-                        // Signed amount — I Owe = -$X, Owed to Me = $X
-                        val balText = formatSigned(debt.remainingBalance, sym, negative = isIOwe || isOverpaid, showDecimals = showDecimals)
-                        val moneyPalette = com.dena.ui.theme.LocalMoneyPalette.current
-                        val balColor = if (isIOwe || isOverpaid) moneyPalette.negative else moneyPalette.positive
-                        Text(
-                            text = balText,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = balColor,
-                            maxLines = 1,
-                        )
-                        if (isOverpaid) {
-                            Text(stringResource(R.string.overpaid), style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (closed) {
+                            // Settled: amount replaced by a quiet status label
+                            Text(
+                                text = "Paid off",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        } else {
+                            // Signed amount — I Owe = -$X, Owed to Me = +$X
+                            val raw = formatSigned(debt.remainingBalance, sym, negative = isIOwe, showDecimals = showDecimals)
+                            val balText = if (isIOwe) raw else "+ $raw"
+                            val moneyPalette = com.dena.ui.theme.LocalMoneyPalette.current
+                            val balColor = if (isIOwe) moneyPalette.negative else moneyPalette.positive
+                            Text(
+                                text = balText,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = balColor,
+                                maxLines = 1,
+                            )
                         }
                     }
                 }

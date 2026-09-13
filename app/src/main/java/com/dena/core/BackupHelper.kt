@@ -41,7 +41,7 @@ object BackupHelper {
 
     fun debtsToJson(debts: List<Debt>): String =
         debts.joinToString(prefix = "[", postfix = "]", separator = ",") { d ->
-            """{"id":${d.id},"contactName":${jsonStr(d.contactName)},"direction":${jsonStr(d.direction)},"principalAmount":${d.principalAmount},"remainingBalance":${d.remainingBalance},"currency":${jsonStr(d.currency)},"dateOpened":${d.dateOpened},"dueDate":${d.dueDate},"category":${jsonStr(d.category)},"notes":${jsonStr(d.notes)}}"""
+            """{"id":${d.id},"contactName":${jsonStr(d.contactName)},"direction":${jsonStr(d.direction)},"principalAmount":${d.principalAmount},"remainingBalance":${d.remainingBalance},"currency":${jsonStr(d.currency)},"dateOpened":${d.dateOpened},"dueDate":${d.dueDate},"category":${jsonStr(d.category)},"notes":${jsonStr(d.notes)},"isClosed":${d.isClosed},"creationDate":${d.creationDate},"createdAt":${d.createdAt},"updatedAt":${d.updatedAt}}"""
         }
 
     fun txsToJson(txs: List<Transaction>): String =
@@ -74,6 +74,8 @@ object BackupHelper {
                         dueDate = if (o.isNull("dueDate")) null else o.optLong("dueDate"),
                         category = o.optString("category", "Other"),
                         notes = o.optString("notes", ""),
+                        isClosed = o.optBoolean("isClosed", false),
+                        creationDate = o.optLong("creationDate", o.optLong("dateOpened", System.currentTimeMillis())),
                         createdAt = o.optLong("createdAt", System.currentTimeMillis()),
                         updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
                     )

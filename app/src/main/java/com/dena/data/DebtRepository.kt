@@ -93,19 +93,27 @@ class DebtRepository(
             }
         }
         
-        val newRemaining = newPrincipal - totalPayments
-        
+        // Balance invariant: never negative (overpayment is blocked at entry);
+        // clamp defensively so no UI path can ever render an "overpaid" state
+        val newRemaining = maxOf(newPrincipal - totalPayments, 0.0)
+
+        // Auto close/reopen: settled at ~0, reopens the moment balance rises above 0
+        val closed = newRemaining <= CLOSE_EPSILON
+
         val updatedDebt = debt.copy(
             principalAmount = newPrincipal,
             remainingBalance = newRemaining,
+            isClosed = closed,
             updatedAt = System.currentTimeMillis()
         )
         debtDao.update(updatedDebt)
     }
 
-    // Record payment: insert transaction + update debt remainingBalance (allows negative for overpayment)
+    // Record payment: insert transaction, then recompute from the ledger (single choke point
+    // keeps balance + isClosed consistent). Overpayments are refused entirely.
     suspend fun recordPayment(debtId: Long, amount: Double, note: String, timestamp: Long = System.currentTimeMillis()): Boolean {
         val debt = debtDao.getById(debtId) ?: return false
+        if (amount <= 0 || amount > debt.remainingBalance + CLOSE_EPSILON) return false
 
         val txDirection = if (debt.direction == "owed_to_me") {
             "payment_received" // they paid you
@@ -115,29 +123,22 @@ class DebtRepository(
 
         val transaction = Transaction.create(debtId, amount, txDirection, note, timestamp)
         transactionDao.insert(transaction)
-
-        // Allow negative balance to track overpayment; do not clamp to 0
-        val newBalance = debt.remainingBalance - amount
-
-        val updatedDebt = debt.copy(
-            remainingBalance = newBalance,
-            updatedAt = System.currentTimeMillis()
-        )
-        debtDao.update(updatedDebt)
+        recalculateDebtBalance(debtId)
         return true
     }
 
-    // Add more debt: increases remainingBalance + principalAmount, logged as debt_added
+    // Add more debt: logged as debt_added, then recompute (reopens a settled debt automatically)
     suspend fun addMoreDebt(debtId: Long, amount: Double, note: String, timestamp: Long = System.currentTimeMillis()): Boolean {
         val debt = debtDao.getById(debtId) ?: return false
+        if (amount <= 0) return false
         val transaction = Transaction.create(debtId, amount, "debt_added", note, timestamp)
         transactionDao.insert(transaction)
-        val updatedDebt = debt.copy(
-            principalAmount = debt.principalAmount + amount,
-            remainingBalance = debt.remainingBalance + amount,
-            updatedAt = System.currentTimeMillis()
-        )
-        debtDao.update(updatedDebt)
+        recalculateDebtBalance(debtId)
         return true
+    }
+
+    companion object {
+        // Half a paisa/cent: ledger amounts are 2-dp, so anything at/below this is "fully paid"
+        const val CLOSE_EPSILON = 0.005
     }
 }

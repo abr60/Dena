@@ -22,7 +22,7 @@ object StatementExport {
         val csv = header + debtLine + txHeader + txLines + "\n\nFinal balance: $sym ${debt.remainingBalance}\n"
         val file = File(context.getExternalFilesDir(null), "dena-${debt.contactName}-${System.currentTimeMillis()}.csv")
         file.writeText(csv)
-        Toast.makeText(context, "CSV saved: ${file.name}", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "CSV saved: ${file.absolutePath}", Toast.LENGTH_LONG).show()
         // share
         try {
             val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
@@ -70,7 +70,7 @@ object StatementExport {
         try {
             val file = File(context.getExternalFilesDir(null), "dena-${debt.contactName}-${System.currentTimeMillis()}.pdf")
             doc.writeTo(file.outputStream())
-            Toast.makeText(context, "PDF saved: ${file.name}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "PDF saved: ${file.absolutePath}", Toast.LENGTH_LONG).show()
             try {
                 val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
                 val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -79,7 +79,7 @@ object StatementExport {
                 context.startActivity(android.content.Intent.createChooser(intent, "Share PDF"))
             } catch (_: Exception) {}
         } catch (e: Exception) {
-            Toast.makeText(context, "PDF failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "PDF failed: ${e.message}", Toast.LENGTH_LONG).show()
         } finally { doc.close() }
     }
 }

@@ -146,12 +146,15 @@ fun DenaTheme(
     // Talom clone — perfect word-for-word Follow System logic
     followSystemTheme: Boolean? = null,
     dynamicColorsEnabled: Boolean? = null,
+    // Manual dark switch for pre-Android-10 (API < 29): no system dark mode exists there
+    manualDark: Boolean? = null,
     content: @Composable () -> Unit,
 ) {
     val ctx = LocalContext.current
     val isSystemDark = isSystemInDarkTheme()
     // Talom verbatim: val darkTheme = if (followSystemTheme) isSysDark else !isSysDark
     val darkTheme = when {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && manualDark != null -> manualDark
         followSystemTheme != null -> if (followSystemTheme) isSystemDark else !isSystemDark
         else -> when (themeMode) {
             DenaThemeMode.SYSTEM -> isSystemDark

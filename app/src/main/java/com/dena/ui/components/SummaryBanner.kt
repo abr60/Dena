@@ -1,11 +1,16 @@
 package com.dena.ui.components
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,6 +30,7 @@ fun SummaryBanner(
     currency: String,
     label: String,
     isOwedToMe: Boolean = true,
+    showPlus: Boolean = false, // I Lent overview: + badge before the total
 ) {
     val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
     val amountText = formatSigned(total, currency, negative = !isOwedToMe, showDecimals = showDecimals)
@@ -48,15 +54,37 @@ fun SummaryBanner(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
             // Large total — match Debt Tracker font: ~42sp extra bold, tight line height
-            Text(
-                text = amountText,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = 44.sp,
-                letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (showPlus) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(30.dp).padding(end = 4.dp),
+                    )
+                    Text(
+                        text = amountText,
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 44.sp,
+                        letterSpacing = (-0.5).sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            } else {
+                Text(
+                    text = amountText,
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 44.sp,
+                    letterSpacing = (-0.5).sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = countText,

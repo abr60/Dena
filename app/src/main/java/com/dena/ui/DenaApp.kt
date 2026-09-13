@@ -106,6 +106,8 @@ fun DenaApp(database: DenaDatabase) {
     // Talom clone: Follow System boolean logic — verbatim
     var followSystemTheme by remember { mutableStateOf(prefs.isFollowSystemTheme()) }
     var dynamicColorsEnabled by remember { mutableStateOf(prefs.isDynamicColorsEnabled()) }
+    // Pre-Android-10 manual switch (light by default)
+    var manualDark by remember { mutableStateOf(prefs.getDarkMode()) }
     var themeMode by rememberSaveable { mutableStateOf(prefs.getThemeMode()) }
     var paletteId by rememberSaveable { mutableStateOf(prefs.getPaletteId()) }
     var paletteEnabled by rememberSaveable { mutableStateOf(prefs.isPaletteEnabled()) }
@@ -135,7 +137,8 @@ fun DenaApp(database: DenaDatabase) {
         fontSize = fontSize,
         dynamicScheme = dynamicScheme,
         followSystemTheme = followSystemTheme,
-        dynamicColorsEnabled = dynamicColorsEnabled
+        dynamicColorsEnabled = dynamicColorsEnabled,
+        manualDark = manualDark
     ) {
         Scaffold(
             bottomBar = {
@@ -240,6 +243,11 @@ fun DenaApp(database: DenaDatabase) {
                                             // keep legacy enum in sync for migration
                                             prefs.setThemeMode(if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT)
                                             themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
+                                        },
+                                        manualDark = manualDark,
+                                        onDarkModeChange = { v ->
+                                            manualDark = v
+                                            prefs.setDarkMode(v)
                                         },
                                         dynamicColorsEnabled = dynamicColorsEnabled,
                                         onDynamicColorsChange = { v ->

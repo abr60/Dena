@@ -23,6 +23,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.room.withTransaction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dena.BuildConfig
@@ -44,9 +48,6 @@ import com.dena.ui.components.DynamicSchemePickerSheet
 import com.dena.ui.theme.DenaThemeMode
 import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -65,6 +66,9 @@ fun SettingsScreen(
     onFollowSystemThemeChange: (Boolean) -> Unit = {},
     dynamicColorsEnabled: Boolean = false,
     onDynamicColorsChange: (Boolean) -> Unit = {},
+    // Pre-Android-10 manual switch (light by default)
+    manualDark: Boolean = false,
+    onDarkModeChange: (Boolean) -> Unit = {},
     database: DenaDatabase? = null,
 ) {
     val context = LocalContext.current
@@ -89,6 +93,7 @@ fun SettingsScreen(
                 dynamicScheme, onDynamicSchemeChange,
                 followSystemTheme, onFollowSystemThemeChange,
                 dynamicColorsEnabled, onDynamicColorsChange,
+                manualDark, onDarkModeChange,
                 onUnlock = { isUnlocked = true; prefs.setUnlocked(true) }
             ) { subpage = null }
             return 
@@ -103,7 +108,7 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(32.dp),
     ) {
-        Box(modifier = Modifier.clickable {
+        Box(modifier = Modifier.fillMaxWidth().clickable {
             val now = System.currentTimeMillis()
             if (now - lastTapMs > 700) tapCount = 1 else tapCount++
             lastTapMs = now
@@ -118,10 +123,10 @@ fun SettingsScreen(
                     Toast.LENGTH_SHORT
                 ).show()
             }
-        }) {
+        }, contentAlignment = androidx.compose.ui.Alignment.Center) {
             AppHeader(secondary = "")
         }
-        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
 
         SettingsGroup {
             NavRow(label = "Appearance", icon = Icons.Filled.Settings, caption = "Theme, scale & colors", onClick = { subpage = "appearance" })
@@ -160,20 +165,32 @@ fun AppearanceSubpage(
     onFollowSystemThemeChange: (Boolean) -> Unit = {},
     dynamicColorsEnabled: Boolean = false,
     onDynamicColorsChange: (Boolean) -> Unit = {},
+    manualDark: Boolean = false,
+    onDarkModeChange: (Boolean) -> Unit = {},
     onUnlock: () -> Unit,
     onBack: () -> Unit
 ) {
     SettingsSubpageScaffold(title = "Appearance", onBack = onBack) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            // Talom clone — verbatim Appearance > Follow system (word-for-word strings & logic)
             SectionHeader("Appearance")
             SettingsGroup {
-                ToggleRow(
-                    label = "Follow system",
-                    caption = if (followSystemTheme) "Uses your system theme" else "Uses the opposite of your system theme",
-                    checked = followSystemTheme,
-                    onCheckedChange = onFollowSystemThemeChange,
-                )
+                // Android 10+ has a system dark mode to follow; older devices get a manual switch
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    // Talom clone — verbatim Appearance > Follow system (word-for-word strings & logic)
+                    ToggleRow(
+                        label = "Follow system",
+                        caption = if (followSystemTheme) "Uses your system theme" else "Uses the opposite of your system theme",
+                        checked = followSystemTheme,
+                        onCheckedChange = onFollowSystemThemeChange,
+                    )
+                } else {
+                    ToggleRow(
+                        label = "Dark theme",
+                        caption = if (manualDark) "Using dark interface" else "Using light interface",
+                        checked = manualDark,
+                        onCheckedChange = onDarkModeChange,
+                    )
+                }
             }
             
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -437,8 +454,84 @@ fun DataBackupBottomSheet(database: DenaDatabase?, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val contentResolver = context.contentResolver
-    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if (uri != null) { scope.launch(Dispatchers.IO) { try { val debts = database?.debtDao()?.getAllOnce() ?: emptyList(); val txs = database?.transactionDao()?.getAllOnce() ?: emptyList(); val json = BackupHelper.exportProfileToJson(debts, txs); contentResolver.openOutputStream(uri)?.use { output -> output.write(json.toByteArray()) }; withContext(Dispatchers.Main) { Toast.makeText(context, "Backup saved", Toast.LENGTH_SHORT).show() } } catch (e: Exception) { withContext(Dispatchers.Main) { Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show() } } } } }
-    val importLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) { scope.launch(Dispatchers.IO) { try { val content = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }; if (content == null) { withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_SHORT).show() }; return@launch }; val decoded = BackupHelper.decodeBackupString(content); if (decoded == null) { withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_SHORT).show() }; return@launch }; val ok = BackupHelper.importProfileFromString(decoded, { debts -> scope.launch(Dispatchers.IO) { for (d in debts) database?.debtDao()?.insert(d.copy(id = 0)) } }, { txs -> scope.launch(Dispatchers.IO) { for (t in txs) database?.transactionDao()?.insert(t.copy(id = 0)) } }); withContext(Dispatchers.Main) { Toast.makeText(context, if (ok) "Import done — restart app" else "Import failed", Toast.LENGTH_LONG).show() } } catch (e: Exception) { withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed", Toast.LENGTH_SHORT).show() } } } } }
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val debts = database?.debtDao()?.getAllOnce() ?: emptyList()
+                    val txs = database?.transactionDao()?.getAllOnce() ?: emptyList()
+                    val json = BackupHelper.exportProfileToJson(debts, txs)
+                    contentResolver.openOutputStream(uri)?.use { output -> output.write(json.toByteArray()) }
+                    val filename = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.dena"
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Backup saved as $filename to your chosen location", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val content = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    if (content == null) {
+                        withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_LONG).show() }
+                        return@launch
+                    }
+                    val decoded = BackupHelper.decodeBackupString(content)
+                    if (decoded == null) {
+                        withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_LONG).show() }
+                        return@launch
+                    }
+                    val debts = mutableListOf<com.dena.data.debt.Debt>()
+                    val txs = mutableListOf<com.dena.data.transaction.Transaction>()
+                    var importError: String? = null
+                    val ok = BackupHelper.importProfileFromString(decoded, { d -> debts.addAll(d) }, { t -> txs.addAll(t) })
+                    if (!ok) {
+                        withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: invalid backup format", Toast.LENGTH_LONG).show() }
+                        return@launch
+                    }
+                    try {
+                        val db = database ?: throw IllegalStateException("Database unavailable")
+                        db.withTransaction {
+                            val existing = db.debtDao().getAllOnce()
+                            val existingKeys = existing.map { "${it.contactName}|${it.direction}|${it.principalAmount}|${it.creationDate}" }.toSet()
+                            val idMap = mutableMapOf<Long, Long>()
+                            for (d in debts) {
+                                val key = "${d.contactName}|${d.direction}|${d.principalAmount}|${d.creationDate}"
+                                if (key in existingKeys) {
+                                    val match = existing.first { "${it.contactName}|${it.direction}|${it.principalAmount}|${it.creationDate}" == key }
+                                    idMap[d.id] = match.id
+                                } else {
+                                    val newId = db.debtDao().insert(d.copy(id = 0))
+                                    idMap[d.id] = newId
+                                }
+                            }
+                            for (t in txs) {
+                                val mappedDebtId = idMap[t.debtId] ?: t.debtId
+                                // skip if debt not found after mapping
+                                if (db.debtDao().getById(mappedDebtId) == null) continue
+                                db.transactionDao().insert(t.copy(id = 0, debtId = mappedDebtId))
+                            }
+                        }
+                    } catch (e: Exception) {
+                        importError = e.message
+                    }
+                    withContext(Dispatchers.Main) {
+                        if (importError != null) Toast.makeText(context, "Import failed: $importError", Toast.LENGTH_LONG).show()
+                        else Toast.makeText(context, "Restored ${debts.size} debts & ${txs.size} transactions — restart app", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
+                }
+            }
+        }
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),

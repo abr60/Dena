@@ -63,11 +63,17 @@ class DenaPreferences(context: Context) {
     fun isDynamicColorsEnabled(): Boolean = prefs.getBoolean(KEY_DYNAMIC_COLORS, false)
     fun setDynamicColorsEnabled(v: Boolean) { prefs.edit().putBoolean(KEY_DYNAMIC_COLORS, v).apply() }
 
+    // Manual dark theme for pre-Android-10 (API < 29) devices with no system dark mode;
+    // defaults to light — the user flips to dark if they prefer
+    fun getDarkMode(): Boolean = prefs.getBoolean(KEY_DARK_MODE, false)
+    fun setDarkMode(v: Boolean) { prefs.edit().putBoolean(KEY_DARK_MODE, v).apply() }
+
     companion object {
         const val PREFS_NAME = "dena_preferences"
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_FOLLOW_SYSTEM_THEME = "follow_system_theme"
         const val KEY_DYNAMIC_COLORS = "dynamic_colors"
+        const val KEY_DARK_MODE = "dark_mode"
         const val KEY_LANGUAGE = "language"
         const val KEY_CURRENCY = "currency"
         const val KEY_SHOW_DECIMALS = "show_decimals"

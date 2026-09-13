@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Info
@@ -33,7 +34,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -121,35 +121,17 @@ fun DebtFormScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
+        androidx.compose.material3.CenterAlignedTopAppBar(
             title = { Text(stringResource(R.string.create_debt)) },
             navigationIcon = {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
             },
         )
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.weight(1f).clickable { isOwedToMe = true }, verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.RadioButton(selected = isOwedToMe, onClick = { isOwedToMe = true })
-                    Text("I Lent", fontSize = 14.sp)
-                }
-                Row(modifier = Modifier.weight(1f).clickable { isOwedToMe = false }, verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.RadioButton(selected = !isOwedToMe, onClick = { isOwedToMe = false })
-                    Text("I Borrowed", fontSize = 14.sp)
-                }
-            }
-            // Creation date — My Debts style: outlined chip, left-aligned
-            OutlinedButton(
-                onClick = { showDatePicker(creationDate) { creationDate = it } },
-                shape = RoundedCornerShape(4.dp),
-                modifier = Modifier.height(52.dp),
-            ) {
-                Icon(Icons.Filled.DateRange, null, modifier = Modifier.padding(end = 8.dp))
-                Text(dateFmt.format(Date(creationDate)))
-            }
+            // Contact name directly below header
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -165,6 +147,27 @@ fun DebtFormScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            // Stacked radios (left) + date chip (right) horizontally opposite
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth().clickable { isOwedToMe = true }, verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.RadioButton(selected = isOwedToMe, onClick = { isOwedToMe = true })
+                        Text("I Lent", fontSize = 14.sp)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth().clickable { isOwedToMe = false }, verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.RadioButton(selected = !isOwedToMe, onClick = { isOwedToMe = false })
+                        Text("I Borrowed", fontSize = 14.sp)
+                    }
+                }
+                OutlinedButton(
+                    onClick = { showDatePicker(creationDate) { creationDate = it } },
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.height(48.dp),
+                ) {
+                    Icon(Icons.Filled.DateRange, null, modifier = Modifier.padding(end = 8.dp))
+                    Text(dateFmt.format(Date(creationDate)))
+                }
+            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = amountText,
@@ -178,7 +181,7 @@ fun DebtFormScreen(
                 OutlinedButton(
                     onClick = { showCurrencyPicker = true },
                     shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.width(96.dp).height(56.dp),
+                    modifier = Modifier.width(80.dp).height(48.dp),
                 ) { Text(currencyCode) }
             }
             if (showCurrencyPicker) {
@@ -198,7 +201,7 @@ fun DebtFormScreen(
                     onClick = { if (!noDueDate) showDatePicker(dueDate ?: System.currentTimeMillis()) { picked -> dueDate = picked } },
                     enabled = !noDueDate,
                     shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.height(52.dp),
+                    modifier = Modifier.height(48.dp),
                 ) {
                     Icon(Icons.Filled.DateRange, null, modifier = Modifier.padding(end = 8.dp))
                     Text(if (dueDate != null) dateFmt.format(Date(dueDate!!)) else "—")
@@ -220,8 +223,11 @@ fun DebtFormScreen(
                 label = { Text(stringResource(R.string.notes)) },
                 placeholder = { Text("debt comment") },
                 leadingIcon = { Icon(Icons.Filled.Info, null) },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
-                minLines = 4,
+                trailingIcon = if (notes.isNotEmpty()) {
+                    { IconButton(onClick = { notes = "" }) { Icon(Icons.Filled.Close, contentDescription = "Clear") } }
+                } else null,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 1,
             )
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
             Button(
@@ -240,7 +246,7 @@ fun DebtFormScreen(
                     onBack()
                 },
                 enabled = canSave,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
             ) { Text(stringResource(R.string.save)) }
         }
     }

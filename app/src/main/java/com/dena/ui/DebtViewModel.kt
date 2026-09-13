@@ -41,23 +41,19 @@ class DebtViewModel(
     }
 
     private fun observeData() {
+        // Lists carry open + closed rows (screens split them); summaries/counts cover open rows only
         viewModelScope.launch {
             repository.observeOwedToMe.collect { debts ->
                 _owedToMe.value = debts
+                _summaryOwedToMe.value = debts.filter { !it.isClosed }.sumOf { it.remainingBalance }
+                _countOwedToMe.value = debts.filter { !it.isClosed }.map { it.contactName }.distinct().size
             }
         }
         viewModelScope.launch {
             repository.observeIOwe.collect { debts ->
                 _iOwe.value = debts
-            }
-        }
-        viewModelScope.launch {
-            while (true) {
-                _summaryOwedToMe.value = repository.sumOwedToMe()
-                _summaryIOwe.value = repository.sumIOwe()
-                _countOwedToMe.value = repository.countOwedToMe()
-                _countIOwe.value = repository.countIOwe()
-                kotlinx.coroutines.delay(1000) // Refresh periodically, or use a flow for these too
+                _summaryIOwe.value = debts.filter { !it.isClosed }.sumOf { it.remainingBalance }
+                _countIOwe.value = debts.filter { !it.isClosed }.map { it.contactName }.distinct().size
             }
         }
     }

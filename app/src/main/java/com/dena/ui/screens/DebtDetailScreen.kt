@@ -105,7 +105,7 @@ fun DebtDetailScreen(
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
+        androidx.compose.material3.CenterAlignedTopAppBar(
             title = { Text(debt.contactName) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
@@ -142,14 +142,20 @@ fun DebtDetailScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                 ) {
-                    val isOverpaid = debt.remainingBalance < 0
                     val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
                     val settled = debt.principalAmount - debt.remainingBalance
                     Text(
-                        text = if (isOverpaid) "Overpaid: ${formatCurrencyRaw(kotlin.math.abs(debt.remainingBalance), sym, showDecimals)}" else "Remaining: ${formatSigned(debt.remainingBalance, sym, negative = !isOwedToMe && !isOverpaid, showDecimals = showDecimals)}",
+                        text = "Remaining: ${formatSigned(debt.remainingBalance, sym, negative = !isOwedToMe, showDecimals = showDecimals)}",
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
+                    if (debt.isClosed) {
+                        Text(
+                            text = "Paid off",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(
                         text = "Total: ${formatCurrencyRaw(debt.principalAmount, sym, showDecimals)}",
                         style = MaterialTheme.typography.bodySmall,
@@ -261,6 +267,7 @@ fun DebtDetailScreen(
         PaymentModal(
             isAddMore = paymentIsAddMore,
             isOwedToMe = isOwedToMe,
+            remainingBalance = debt.remainingBalance,
             onDismiss = { showPaymentModal = false },
             onSave = { amount, note, ts ->
                 if (paymentIsAddMore) viewModel.addMoreDebt(debtId, amount, note, ts)
@@ -296,6 +303,7 @@ fun DebtDetailScreen(
         EditTransactionDialog(
             transaction = tx,
             debtDirection = debt.direction,
+            remainingBalance = debt.remainingBalance,
             onDismiss = { editingTx = null },
             onSave = { updated ->
                 viewModel.updateTransaction(updated)
@@ -381,6 +389,7 @@ private fun TransactionRow(
 fun EditTransactionDialog(
     transaction: Transaction,
     debtDirection: String,
+    remainingBalance: Double = 0.0,
     onDismiss: () -> Unit,
     onSave: (Transaction) -> Unit,
     onDelete: () -> Unit,
@@ -402,6 +411,13 @@ fun EditTransactionDialog(
     val typeOptions = if (debtDirection == "owed_to_me") listOf("Debt added", "Payment received") else listOf("Debt added", "Payment made")
     val dirValues = if (debtDirection == "owed_to_me") listOf("debt_added", "payment_received") else listOf("debt_added", "payment_made")
     val selectedIdx = dirValues.indexOf(txDirection).coerceAtLeast(0)
+    // Cap edited payments so no edit can create an overpaid balance:
+    // removing this row first would leave `remainingBalance + oldAmount` payable at most
+    val oldWasPayment = transaction.direction == "payment_received" || transaction.direction == "payment_made"
+    val nowIsPayment = txDirection != "debt_added"
+    val enteredEditAmount = amountText.toDoubleOrNull() ?: 0.0
+    val maxPayable = remainingBalance + if (oldWasPayment) transaction.amount else 0.0
+    val editExceeds = nowIsPayment && enteredEditAmount > maxPayable + com.dena.data.DebtRepository.CLOSE_EPSILON
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -448,6 +464,10 @@ fun EditTransactionDialog(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
+                isError = editExceeds,
+                supportingText = if (editExceeds) {
+                    { Text("Amount exceeds remaining debt", color = MaterialTheme.colorScheme.error) }
+                } else null,
             )
             OutlinedTextField(
                 value = noteText,
@@ -489,9 +509,9 @@ fun EditTransactionDialog(
                 Button(
                     onClick = {
                         val amount = amountText.toDoubleOrNull() ?: 0.0
-                        if (amount > 0) onSave(transaction.copy(amount = amount, note = noteText, timestamp = txDate, direction = txDirection))
+                        if (amount > 0 && !editExceeds) onSave(transaction.copy(amount = amount, note = noteText, timestamp = txDate, direction = txDirection))
                     },
-                    enabled = (amountText.toDoubleOrNull() ?: 0.0) > 0,
+                    enabled = enteredEditAmount > 0 && !editExceeds,
                     shape = RoundedCornerShape(12.dp),
                 ) { Text(stringResource(R.string.save), fontWeight = FontWeight.SemiBold) }
             }
@@ -514,6 +534,7 @@ fun EditTransactionDialog(
 fun PaymentModal(
     isAddMore: Boolean,
     isOwedToMe: Boolean,
+    remainingBalance: Double = 0.0,
     onDismiss: () -> Unit,
     onSave: (Double, String, Long) -> Unit,
 ) {
@@ -532,6 +553,9 @@ fun PaymentModal(
 
     val title = if (isAddMore) (if (isOwedToMe) "Lend More" else "Borrow More") else "Log Payment"
     val amountLabel = if (isAddMore) (if (isOwedToMe) "Amount to lend" else "Amount to borrow") else "Amount to log"
+    // Live overpayment guard: payments can never exceed what is left
+    val enteredAmount = amountText.toDoubleOrNull() ?: 0.0
+    val exceedsBalance = !isAddMore && enteredAmount > remainingBalance + com.dena.data.DebtRepository.CLOSE_EPSILON
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -549,6 +573,10 @@ fun PaymentModal(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    isError = exceedsBalance,
+                    supportingText = if (exceedsBalance) {
+                        { Text("Amount exceeds remaining debt", color = MaterialTheme.colorScheme.error) }
+                    } else null,
                 )
                 OutlinedTextField(
                     value = noteText,
@@ -571,9 +599,9 @@ fun PaymentModal(
             Button(
                 onClick = {
                     val amount = amountText.toDoubleOrNull() ?: 0.0
-                    if (amount > 0) onSave(amount, noteText, txDate)
+                    if (amount > 0 && !exceedsBalance) onSave(amount, noteText, txDate)
                 },
-                enabled = (amountText.toDoubleOrNull() ?: 0.0) > 0,
+                enabled = enteredAmount > 0 && !exceedsBalance,
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
