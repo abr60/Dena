@@ -73,20 +73,62 @@ fun buildColorScheme(palette: ThemePalette): androidx.compose.material3.ColorSch
 enum class DenaThemeMode { SYSTEM, LIGHT, DARK, DYNAMIC }
 
 // Monochrome fallback
+// Explicit neutral primaryContainer so FABs stay neutral instead of
+// inheriting Material 3 stock containers (lavender/purple), plus explicit
+// neutral surfaceContainer ramp so dialogs and bottom sheets remain neutral.
 private val DenaLightScheme = lightColorScheme(
     primary = Color(0xFF1A1A1A), onPrimary = Color.White,
+    primaryContainer = Color(0xFFE0E0E0), onPrimaryContainer = Color(0xFF1A1A1A),
     background = Color(0xFFF5F5F5), onBackground = Color(0xFF1A1A1A),
     surface = Color(0xFFF0F0F0), onSurface = Color(0xFF1A1A1A),
     surfaceVariant = Color(0xFFE8E8E8), onSurfaceVariant = Color(0xFF888888),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFAFAFA),
+    surfaceContainer = Color(0xFFF2F2F2),
+    surfaceContainerHigh = Color(0xFFECECEC),
+    surfaceContainerHighest = Color(0xFFE4E4E4),
     outline = Color(0xFFD0D0D0), error = Color(0xFFE57373)
 )
 private val DenaDarkScheme = darkColorScheme(
     primary = Color(0xFFF0F0F0), onPrimary = Color.Black,
+    primaryContainer = Color(0xFF2A2A2A), onPrimaryContainer = Color(0xFFF0F0F0),
     background = Color.Black, onBackground = Color(0xFFF0F0F0),
     surface = Color(0xFF0A0A0A), onSurface = Color(0xFFF0F0F0),
     surfaceVariant = Color(0xFF1A1A1A), onSurfaceVariant = Color(0xFF999999),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF060606),
+    surfaceContainer = Color(0xFF0D0D0D),
+    surfaceContainerHigh = Color(0xFF141414),
+    surfaceContainerHighest = Color(0xFF1E1E1E),
     outline = Color(0xFF333333), error = Color(0xFFE57373)
 )
+
+fun buildDynamicScheme(ctx: Context, dark: Boolean): androidx.compose.material3.ColorScheme {
+    val d = if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+    val base = if (dark) DenaDarkScheme else DenaLightScheme
+    return base.copy(
+        primary = d.primary,
+        onPrimary = d.onPrimary,
+        primaryContainer = d.primaryContainer,
+        onPrimaryContainer = d.onPrimaryContainer,
+        inversePrimary = d.inversePrimary,
+        secondary = d.secondary,
+        onSecondary = d.onSecondary,
+        secondaryContainer = d.secondaryContainer,
+        onSecondaryContainer = d.onSecondaryContainer,
+        tertiary = d.tertiary,
+        onTertiary = d.onTertiary,
+        tertiaryContainer = d.tertiaryContainer,
+        onTertiaryContainer = d.onTertiaryContainer,
+        inverseSurface = d.inverseSurface,
+        inverseOnSurface = d.inverseOnSurface,
+        surfaceTint = d.primary,
+        error = Color(0xFFE57373),
+        onError = contrastOn(Color(0xFFE57373)),
+        errorContainer = blend(Color(0xFFE57373), base.background, 0.25f),
+        onErrorContainer = Color(0xFFE57373),
+    )
+}
 
 fun fontScaleFor(size: String): Float = when (size.lowercase()) {
     "small" -> 0.85f
@@ -99,6 +141,7 @@ fun DenaTheme(
     themeMode: DenaThemeMode,
     palette: ThemePalette?,
     fontSize: String = "medium",
+    dynamicScheme: String = "system",
     content: @Composable () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -107,11 +150,15 @@ fun DenaTheme(
         DenaThemeMode.SYSTEM -> isSystemDark
         DenaThemeMode.LIGHT -> false
         DenaThemeMode.DARK -> true
-        DenaThemeMode.DYNAMIC -> isSystemDark
+        DenaThemeMode.DYNAMIC -> when (dynamicScheme.lowercase()) {
+            "dark" -> true
+            "light" -> false
+            else -> isSystemDark
+        }
     }
 
     val colorScheme = when {
-        themeMode == DenaThemeMode.DYNAMIC -> if (darkTheme) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+        themeMode == DenaThemeMode.DYNAMIC -> buildDynamicScheme(ctx, darkTheme)
         palette != null -> buildColorScheme(palette)
         darkTheme -> DenaDarkScheme
         else -> DenaLightScheme

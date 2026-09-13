@@ -106,6 +106,7 @@ fun DenaApp(database: DenaDatabase) {
     var themeMode by rememberSaveable { mutableStateOf(prefs.getThemeMode()) }
     var paletteId by rememberSaveable { mutableStateOf(prefs.getPaletteId()) }
     var paletteEnabled by rememberSaveable { mutableStateOf(prefs.isPaletteEnabled()) }
+    var dynamicScheme by rememberSaveable { mutableStateOf(prefs.getDynamicScheme()) }
     var fontSize by rememberSaveable { mutableStateOf(prefs.getFontSize()) }
 
     // Floating action button only on main tabs (not settings)
@@ -128,7 +129,8 @@ fun DenaApp(database: DenaDatabase) {
     com.dena.ui.theme.DenaTheme(
         themeMode = themeMode,
         palette = if (themeMode != DenaThemeMode.DYNAMIC && paletteEnabled) PaletteRegistry.find(paletteId) else null,
-        fontSize = fontSize
+        fontSize = fontSize,
+        dynamicScheme = dynamicScheme
     ) {
         Scaffold(
             bottomBar = {
@@ -234,6 +236,11 @@ fun DenaApp(database: DenaDatabase) {
                                         onPaletteEnabledChange = { enabled ->
                                             paletteEnabled = enabled
                                             prefs.setPaletteEnabled(enabled)
+                                        },
+                                        dynamicScheme = dynamicScheme,
+                                        onDynamicSchemeChange = { newScheme ->
+                                            dynamicScheme = newScheme
+                                            prefs.setDynamicScheme(newScheme)
                                         },
                                         fontSize = fontSize,
                                         onFontSizeChange = { newSize ->

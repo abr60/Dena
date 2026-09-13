@@ -43,6 +43,10 @@ class DenaPreferences(context: Context) {
     fun isPaletteEnabled(): Boolean = prefs.getBoolean(KEY_PALETTE_ENABLED, false)
     fun setPaletteEnabled(v: Boolean) { prefs.edit().putBoolean(KEY_PALETTE_ENABLED, v).apply() }
 
+    // Material You scheme override: "system" (follow system), "light", "dark"
+    fun getDynamicScheme(): String = prefs.getString(KEY_DYNAMIC_SCHEME, DYNAMIC_SYSTEM) ?: DYNAMIC_SYSTEM
+    fun setDynamicScheme(v: String) { prefs.edit().putString(KEY_DYNAMIC_SCHEME, v.lowercase(java.util.Locale.US)).apply() }
+
     fun isUnlocked(): Boolean = prefs.getBoolean(KEY_UNLOCKED, false)
     fun setUnlocked(v: Boolean) { prefs.edit().putBoolean(KEY_UNLOCKED, v).apply() }
 
@@ -55,6 +59,10 @@ class DenaPreferences(context: Context) {
         const val KEY_PALETTE = "palette_id"
         const val KEY_PALETTE_ENABLED = "palette_enabled"
         const val KEY_FONT_SIZE = "font_size"
+        const val KEY_DYNAMIC_SCHEME = "dynamic_scheme"
+        const val DYNAMIC_SYSTEM = "system"
+        const val DYNAMIC_LIGHT = "light"
+        const val DYNAMIC_DARK = "dark"
         const val KEY_SHOW_PERCENTAGE = "show_percentage"
         const val KEY_HISTORY_CLEAN_DAYS = "history_clean_days"
         const val KEY_UNLOCKED = "unlocked"

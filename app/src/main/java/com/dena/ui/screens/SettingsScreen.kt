@@ -40,6 +40,7 @@ import com.dena.ui.components.SettingsGroup
 import com.dena.ui.components.SettingsRow
 import com.dena.ui.components.SettingsSubpageScaffold
 import com.dena.ui.components.ToggleRow
+import com.dena.ui.components.DynamicSchemePickerSheet
 import com.dena.ui.theme.DenaThemeMode
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -57,6 +58,8 @@ fun SettingsScreen(
     paletteEnabled: Boolean,
     fontSize: String = "medium",
     onFontSizeChange: (String) -> Unit = {},
+    dynamicScheme: String = "system",
+    onDynamicSchemeChange: (String) -> Unit = {},
     database: DenaDatabase? = null,
 ) {
     val context = LocalContext.current
@@ -75,9 +78,10 @@ fun SettingsScreen(
         "activity" -> { RecentActivitySubpage(database = database, onBack = { subpage = null }); return }
         "appearance" -> { 
             AppearanceSubpage(
-                themeMode, onThemeChange, paletteId, onPaletteChange, 
-                onPaletteEnabledChange, paletteEnabled, isUnlocked, 
+                themeMode, onThemeChange, paletteId, onPaletteChange,
+                onPaletteEnabledChange, paletteEnabled, isUnlocked,
                 fontSize, onFontSizeChange,
+                dynamicScheme, onDynamicSchemeChange,
                 onUnlock = { isUnlocked = true; prefs.setUnlocked(true) }
             ) { subpage = null }
             return 
@@ -142,6 +146,8 @@ fun AppearanceSubpage(
     isUnlocked: Boolean,
     fontSize: String,
     onFontSizeChange: (String) -> Unit,
+    dynamicScheme: String,
+    onDynamicSchemeChange: (String) -> Unit,
     onUnlock: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -173,7 +179,7 @@ fun AppearanceSubpage(
 
             if (isUnlocked) {
                 SectionHeader("ADVANCED")
-                ToggleRow(label = "Dynamic colors (Material You)", caption = "Use wallpaper colors (Android 12+)", checked = themeMode == DenaThemeMode.DYNAMIC, onCheckedChange = { 
+                ToggleRow(label = "Dynamic colors (Material You)", caption = "Use wallpaper colors (Android 12+)", checked = themeMode == DenaThemeMode.DYNAMIC, onCheckedChange = {
                     if (it) {
                         onThemeChange(DenaThemeMode.DYNAMIC)
                         onPaletteEnabledChange(false)
@@ -181,7 +187,28 @@ fun AppearanceSubpage(
                         onThemeChange(DenaThemeMode.LIGHT)
                     }
                 })
-                
+
+                if (themeMode == DenaThemeMode.DYNAMIC) {
+                    var showDynamicSchemeSheet by remember { mutableStateOf(false) }
+                    SectionHeader("MATERIAL YOU SCHEME")
+                    SettingsGroup {
+                        Box(modifier = Modifier.fillMaxWidth().clickable { showDynamicSchemeSheet = true }) {
+                            SettingsRow(
+                                label = "Dynamic scheme",
+                                value = when (dynamicScheme) { "light" -> "Light"; "dark" -> "Dark"; else -> "System" },
+                                showDivider = false,
+                            )
+                        }
+                    }
+                    if (showDynamicSchemeSheet) {
+                        DynamicSchemePickerSheet(
+                            currentScheme = dynamicScheme,
+                            onPick = { picked -> onDynamicSchemeChange(picked); showDynamicSchemeSheet = false },
+                            onDismiss = { showDynamicSchemeSheet = false },
+                        )
+                    }
+                }
+
                 SectionHeader("COLOR PALETTE")
                 ToggleRow(label = "Enable Omarchy Palette", caption = "Apply curated color theme", checked = paletteEnabled, onCheckedChange = { 
                     onPaletteEnabledChange(it)
