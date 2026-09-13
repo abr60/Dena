@@ -14,8 +14,8 @@ android {
         applicationId = "com.dena"
         minSdk = 24 // floor: LocaleHelper (LocaleList/setLocales) — do not raise (see AGENTS.md)
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.4.0-alpha"
+        versionCode = 6
+        versionName = "0.5.0-alpha"
         resourceConfigurations += listOf("en", "bn") // prunes unused locales from deps — part of 1.3 MB win
     }
 

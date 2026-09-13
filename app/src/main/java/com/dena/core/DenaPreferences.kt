@@ -50,9 +50,24 @@ class DenaPreferences(context: Context) {
     fun isUnlocked(): Boolean = prefs.getBoolean(KEY_UNLOCKED, false)
     fun setUnlocked(v: Boolean) { prefs.edit().putBoolean(KEY_UNLOCKED, v).apply() }
 
+    // Talom clone: Follow system + Dynamic colors (boolean) — verbatim keys & defaults
+    fun isFollowSystemTheme(): Boolean {
+        // migrate legacy themeMode if new key not yet written
+        if (!prefs.contains(KEY_FOLLOW_SYSTEM_THEME) && prefs.contains(KEY_THEME_MODE)) {
+            return getThemeMode() == com.dena.ui.theme.DenaThemeMode.SYSTEM
+        }
+        return prefs.getBoolean(KEY_FOLLOW_SYSTEM_THEME, true)
+    }
+    fun setFollowSystemTheme(v: Boolean) { prefs.edit().putBoolean(KEY_FOLLOW_SYSTEM_THEME, v).apply() }
+
+    fun isDynamicColorsEnabled(): Boolean = prefs.getBoolean(KEY_DYNAMIC_COLORS, false)
+    fun setDynamicColorsEnabled(v: Boolean) { prefs.edit().putBoolean(KEY_DYNAMIC_COLORS, v).apply() }
+
     companion object {
         const val PREFS_NAME = "dena_preferences"
         const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_FOLLOW_SYSTEM_THEME = "follow_system_theme"
+        const val KEY_DYNAMIC_COLORS = "dynamic_colors"
         const val KEY_LANGUAGE = "language"
         const val KEY_CURRENCY = "currency"
         const val KEY_SHOW_DECIMALS = "show_decimals"

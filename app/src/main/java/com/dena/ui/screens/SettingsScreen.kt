@@ -60,6 +60,11 @@ fun SettingsScreen(
     onFontSizeChange: (String) -> Unit = {},
     dynamicScheme: String = "system",
     onDynamicSchemeChange: (String) -> Unit = {},
+    // Talom clone — Follow System verbatim (added, default keeps backward compat)
+    followSystemTheme: Boolean = true,
+    onFollowSystemThemeChange: (Boolean) -> Unit = {},
+    dynamicColorsEnabled: Boolean = false,
+    onDynamicColorsChange: (Boolean) -> Unit = {},
     database: DenaDatabase? = null,
 ) {
     val context = LocalContext.current
@@ -82,6 +87,8 @@ fun SettingsScreen(
                 onPaletteEnabledChange, paletteEnabled, isUnlocked,
                 fontSize, onFontSizeChange,
                 dynamicScheme, onDynamicSchemeChange,
+                followSystemTheme, onFollowSystemThemeChange,
+                dynamicColorsEnabled, onDynamicColorsChange,
                 onUnlock = { isUnlocked = true; prefs.setUnlocked(true) }
             ) { subpage = null }
             return 
@@ -148,13 +155,26 @@ fun AppearanceSubpage(
     onFontSizeChange: (String) -> Unit,
     dynamicScheme: String,
     onDynamicSchemeChange: (String) -> Unit,
+    // Talom clone — verbatim Follow System
+    followSystemTheme: Boolean = true,
+    onFollowSystemThemeChange: (Boolean) -> Unit = {},
+    dynamicColorsEnabled: Boolean = false,
+    onDynamicColorsChange: (Boolean) -> Unit = {},
     onUnlock: () -> Unit,
     onBack: () -> Unit
 ) {
     SettingsSubpageScaffold(title = "Appearance", onBack = onBack) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            SectionHeader("THEME")
-            ToggleRow(label = "Follow system", caption = "On: match system light/dark. Off: use opposite.", checked = themeMode == DenaThemeMode.SYSTEM, onCheckedChange = { if (it) onThemeChange(DenaThemeMode.SYSTEM) else onThemeChange(DenaThemeMode.LIGHT) })
+            // Talom clone — verbatim Appearance > Follow system (word-for-word strings & logic)
+            SectionHeader("Appearance")
+            SettingsGroup {
+                ToggleRow(
+                    label = "Follow system",
+                    caption = if (followSystemTheme) "Uses your system theme" else "Uses the opposite of your system theme",
+                    checked = followSystemTheme,
+                    onCheckedChange = onFollowSystemThemeChange,
+                )
+            }
             
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 var showScaleSheet by remember { mutableStateOf(false) }
@@ -177,45 +197,47 @@ fun AppearanceSubpage(
                 }
             }
 
-            if (isUnlocked) {
-                SectionHeader("ADVANCED")
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                    ToggleRow(label = "Dynamic colors (Material You)", caption = "Use wallpaper colors (Android 12+)", checked = themeMode == DenaThemeMode.DYNAMIC, onCheckedChange = {
-                        if (it) {
-                            onThemeChange(DenaThemeMode.DYNAMIC)
-                            onPaletteEnabledChange(false)
-                        } else {
-                            onThemeChange(DenaThemeMode.LIGHT)
-                        }
-                    })
-
-                    if (themeMode == DenaThemeMode.DYNAMIC) {
-                        var showDynamicSchemeSheet by remember { mutableStateOf(false) }
-                        SectionHeader("MATERIAL YOU SCHEME")
-                        SettingsGroup {
-                            Box(modifier = Modifier.fillMaxWidth().clickable { showDynamicSchemeSheet = true }) {
-                                SettingsRow(
-                                    label = "Dynamic scheme",
-                                    value = when (dynamicScheme) { "light" -> "Light"; "dark" -> "Dark"; else -> "System" },
-                                    showDivider = false,
-                                )
-                            }
-                        }
-                        if (showDynamicSchemeSheet) {
-                            DynamicSchemePickerSheet(
-                                currentScheme = dynamicScheme,
-                                onPick = { picked -> onDynamicSchemeChange(picked); showDynamicSchemeSheet = false },
-                                onDismiss = { showDynamicSchemeSheet = false },
-                            )
-                        }
+            // Talom clone — verbatim Advanced > Dynamic colors (word-for-word strings & logic)
+            if (isUnlocked && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader("Advanced")
+                    SettingsGroup {
+                        ToggleRow(
+                            label = "Dynamic colors (Material You)",
+                            caption = "Derives accents from your wallpaper",
+                            checked = dynamicColorsEnabled,
+                            onCheckedChange = onDynamicColorsChange,
+                        )
                     }
                 }
-                
+            }
+            if (dynamicColorsEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                var showDynamicSchemeSheet by remember { mutableStateOf(false) }
+                SectionHeader("MATERIAL YOU SCHEME")
+                SettingsGroup {
+                    Box(modifier = Modifier.fillMaxWidth().clickable { showDynamicSchemeSheet = true }) {
+                        SettingsRow(
+                            label = "Dynamic scheme",
+                            value = when (dynamicScheme) { "light" -> "Light"; "dark" -> "Dark"; else -> "System" },
+                            showDivider = false,
+                        )
+                    }
+                }
+                if (showDynamicSchemeSheet) {
+                    DynamicSchemePickerSheet(
+                        currentScheme = dynamicScheme,
+                        onPick = { picked -> onDynamicSchemeChange(picked); showDynamicSchemeSheet = false },
+                        onDismiss = { showDynamicSchemeSheet = false },
+                    )
+                }
+            }
+            if (isUnlocked) {
                 SectionHeader("COLOR PALETTE")
                 ToggleRow(label = "Enable Omarchy Palette", caption = "Apply curated color theme", checked = paletteEnabled, onCheckedChange = { 
                     onPaletteEnabledChange(it)
                     if (it) {
-                        onThemeChange(DenaThemeMode.LIGHT) // Disable dynamic if enabling palette
+                        onDynamicColorsChange(false)
+                        onThemeChange(DenaThemeMode.LIGHT) // Disable dynamic if enabling palette (legacy sync)
                     }
                 })
 

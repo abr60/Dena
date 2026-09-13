@@ -103,6 +103,9 @@ fun DenaApp(database: DenaDatabase) {
     var settingsTabReselected by rememberSaveable { mutableStateOf(false) }
     var showDebtForm by rememberSaveable { mutableStateOf(false) }
     var selectedDebtId by rememberSaveable { mutableStateOf<Long?>(null) }
+    // Talom clone: Follow System boolean logic — verbatim
+    var followSystemTheme by remember { mutableStateOf(prefs.isFollowSystemTheme()) }
+    var dynamicColorsEnabled by remember { mutableStateOf(prefs.isDynamicColorsEnabled()) }
     var themeMode by rememberSaveable { mutableStateOf(prefs.getThemeMode()) }
     var paletteId by rememberSaveable { mutableStateOf(prefs.getPaletteId()) }
     var paletteEnabled by rememberSaveable { mutableStateOf(prefs.isPaletteEnabled()) }
@@ -128,9 +131,11 @@ fun DenaApp(database: DenaDatabase) {
 
     com.dena.ui.theme.DenaTheme(
         themeMode = themeMode,
-        palette = if (themeMode != DenaThemeMode.DYNAMIC && paletteEnabled) PaletteRegistry.find(paletteId) else null,
+        palette = if (!dynamicColorsEnabled && paletteEnabled) PaletteRegistry.find(paletteId) else null,
         fontSize = fontSize,
-        dynamicScheme = dynamicScheme
+        dynamicScheme = dynamicScheme,
+        followSystemTheme = followSystemTheme,
+        dynamicColorsEnabled = dynamicColorsEnabled
     ) {
         Scaffold(
             bottomBar = {
@@ -226,6 +231,26 @@ fun DenaApp(database: DenaDatabase) {
                                         onThemeChange = { newMode ->
                                             themeMode = newMode
                                             prefs.setThemeMode(newMode)
+                                        },
+                                        // Talom clone: Follow System verbatim
+                                        followSystemTheme = followSystemTheme,
+                                        onFollowSystemThemeChange = { v ->
+                                            followSystemTheme = v
+                                            prefs.setFollowSystemTheme(v)
+                                            // keep legacy enum in sync for migration
+                                            prefs.setThemeMode(if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT)
+                                            themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
+                                        },
+                                        dynamicColorsEnabled = dynamicColorsEnabled,
+                                        onDynamicColorsChange = { v ->
+                                            dynamicColorsEnabled = v
+                                            prefs.setDynamicColorsEnabled(v)
+                                            prefs.setThemeMode(if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM)
+                                            themeMode = if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM
+                                            if (v) {
+                                                paletteEnabled = false
+                                                prefs.setPaletteEnabled(false)
+                                            }
                                         },
                                         paletteId = paletteId,
                                         onPaletteChange = { newId ->

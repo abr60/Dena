@@ -1,6 +1,7 @@
 package com.dena.ui.theme
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -138,27 +139,35 @@ fun fontScaleFor(size: String): Float = when (size.lowercase()) {
 
 @Composable
 fun DenaTheme(
-    themeMode: DenaThemeMode,
-    palette: ThemePalette?,
+    themeMode: DenaThemeMode = DenaThemeMode.SYSTEM,
+    palette: ThemePalette? = null,
     fontSize: String = "medium",
     dynamicScheme: String = "system",
+    // Talom clone — perfect word-for-word Follow System logic
+    followSystemTheme: Boolean? = null,
+    dynamicColorsEnabled: Boolean? = null,
     content: @Composable () -> Unit,
 ) {
     val ctx = LocalContext.current
     val isSystemDark = isSystemInDarkTheme()
-    val darkTheme = when (themeMode) {
-        DenaThemeMode.SYSTEM -> isSystemDark
-        DenaThemeMode.LIGHT -> false
-        DenaThemeMode.DARK -> true
-        DenaThemeMode.DYNAMIC -> when (dynamicScheme.lowercase()) {
-            "dark" -> true
-            "light" -> false
-            else -> isSystemDark
+    // Talom verbatim: val darkTheme = if (followSystemTheme) isSysDark else !isSysDark
+    val darkTheme = when {
+        followSystemTheme != null -> if (followSystemTheme) isSystemDark else !isSystemDark
+        else -> when (themeMode) {
+            DenaThemeMode.SYSTEM -> isSystemDark
+            DenaThemeMode.LIGHT -> false
+            DenaThemeMode.DARK -> true
+            DenaThemeMode.DYNAMIC -> when (dynamicScheme.lowercase()) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemDark
+            }
         }
     }
 
+    val effectiveDynamic = dynamicColorsEnabled ?: (themeMode == DenaThemeMode.DYNAMIC)
     val colorScheme = when {
-        themeMode == DenaThemeMode.DYNAMIC -> buildDynamicScheme(ctx, darkTheme)
+        effectiveDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> buildDynamicScheme(ctx, darkTheme)
         palette != null -> buildColorScheme(palette)
         darkTheme -> DenaDarkScheme
         else -> DenaLightScheme

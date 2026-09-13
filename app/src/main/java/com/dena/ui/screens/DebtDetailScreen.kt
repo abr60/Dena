@@ -376,6 +376,7 @@ private fun TransactionRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditTransactionDialog(
     transaction: Transaction,
@@ -401,63 +402,101 @@ fun EditTransactionDialog(
     val typeOptions = if (debtDirection == "owed_to_me") listOf("Debt added", "Payment received") else listOf("Debt added", "Payment made")
     val dirValues = if (debtDirection == "owed_to_me") listOf("debt_added", "payment_received") else listOf("debt_added", "payment_made")
     val selectedIdx = dirValues.indexOf(txDirection).coerceAtLeast(0)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Edit entry") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    dirValues.forEachIndexed { idx, _ ->
-                        val sel = idx == selectedIdx
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text("Edit entry", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Change the amount, note, date or type. Balance recalculates on save.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                dirValues.forEachIndexed { idx, _ ->
+                    val sel = idx == selectedIdx
+                    if (sel) {
+                        Button(
+                            onClick = { txDirection = dirValues[idx] },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                        ) { Text(typeOptions[idx], fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+                    } else {
                         OutlinedButton(
                             onClick = { txDirection = dirValues[idx] },
                             modifier = Modifier.weight(1f),
-                            colors = if (sel) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
+                            shape = RoundedCornerShape(12.dp),
                         ) { Text(typeOptions[idx], fontSize = 12.sp) }
                     }
                 }
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) amountText = it },
-                    label = { Text("Amount") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = noteText,
-                    onValueChange = { noteText = it },
-                    label = { Text(stringResource(R.string.note_optional)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            }
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) amountText = it },
+                label = { Text("Amount") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            )
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = { noteText = it },
+                label = { Text(stringResource(R.string.note_optional)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            )
+            Box(modifier = Modifier.fillMaxWidth().clickable { pick() }) {
                 OutlinedTextField(
                     value = df.format(txDate),
                     onValueChange = {},
                     label = { Text("Date") },
                     leadingIcon = { Icon(Icons.Filled.DateRange, null) },
                     readOnly = true,
-                    modifier = Modifier.fillMaxWidth().clickable { pick() },
+                    enabled = false,
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
                 )
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val amount = amountText.toDoubleOrNull() ?: 0.0
-                    if (amount > 0) onSave(transaction.copy(amount = amount, note = noteText, timestamp = txDate, direction = txDirection))
-                },
-                enabled = (amountText.toDoubleOrNull() ?: 0.0) > 0,
-            ) { Text(stringResource(R.string.save)) }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { showDeleteConfirm = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete") }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = { showDeleteConfirm = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Delete", fontWeight = FontWeight.SemiBold) }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = {
+                        val amount = amountText.toDoubleOrNull() ?: 0.0
+                        if (amount > 0) onSave(transaction.copy(amount = amount, note = noteText, timestamp = txDate, direction = txDirection))
+                    },
+                    enabled = (amountText.toDoubleOrNull() ?: 0.0) > 0,
+                    shape = RoundedCornerShape(12.dp),
+                ) { Text(stringResource(R.string.save), fontWeight = FontWeight.SemiBold) }
             }
-        },
-    )
+        }
+    }
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
