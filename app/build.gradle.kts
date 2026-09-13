@@ -12,11 +12,11 @@ android {
 
     defaultConfig {
         applicationId = "com.dena"
-        minSdk = 24
+        minSdk = 24 // floor: LocaleHelper (LocaleList/setLocales) — do not raise (see AGENTS.md)
         targetSdk = 35
         versionCode = 5
         versionName = "0.4.0-alpha"
-        resourceConfigurations += listOf("en", "bn")
+        resourceConfigurations += listOf("en", "bn") // prunes unused locales from deps — part of 1.3 MB win
     }
 
     buildFeatures {
@@ -61,11 +61,11 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = true
+            isMinifyEnabled = true // R8 full — required for 1.3 MB (see AGENTS.md). Don't disable.
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro" // keeps: Room entities/DAOs + BuildConfig (see file)
             )
             val releaseSigning = signingConfigs.findByName("release")
             if (releaseSigning != null && releaseSigning.storeFile?.exists() == true) {
@@ -75,12 +75,9 @@ android {
     }
 
     packaging {
-        dex {
-            useLegacyPackaging = true
-        }
-        jniLibs {
-            useLegacyPackaging = true
-        }
+        // Explicit compression — prevents silent size regression if minSdk >= 28 (AGP would store dex uncompressed)
+        dex { useLegacyPackaging = true }
+        jniLibs { useLegacyPackaging = true }
     }
 
     lint {
@@ -100,7 +97,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material:material-icons-core")
-    debugImplementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling-preview") // must stay debugImplementation (AGENTS.md)
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation("androidx.room:room-runtime:2.6.1")
