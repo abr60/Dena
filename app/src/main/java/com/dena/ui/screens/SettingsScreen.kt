@@ -356,46 +356,43 @@ fun AboutSubpage(onBack: () -> Unit) {
                 )
             }
 
-            SectionHeader("OUR MOTTO")
+            SectionHeader("WHAT IS DENA")
             Text(
-                "Dena comes from the Bengali word for debt — but also for what is owed in trust. Our motto is simple: clarity creates trust. Every taka, every promise, every handshake deserves a clear record, free from awkward reminders and forgotten details.",
+                "Dena comes from the Bengali word for debt — but also for what is owed in trust. It is the quiet companion that remembers what memory shouldn't have to: every taka lent, every promise made, every handshake between friends that deserves a clear, honest record. Offline-first, on your device, yours completely.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
 
-            SectionHeader("WHY DENA EXISTS")
-            Text(
-                "We built Dena because lending to friends and family shouldn't ruin relationships — and forgetting shouldn't either. Spreadsheets get lost. Notes apps get messy. Memory fades when you need it most.\n\nDena was born to be the quiet companion that remembers for you: offline-first, private, fast, and respectful of the trust you place in each other.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-
-            SectionHeader("BUILT WITH PASSION")
-            Text(
-                "Crafted with care for people who take their word seriously. Every card, every animation, every palette is chosen to feel calm and trustworthy — never stressful. No ads. No cloud. No tracking. Just you and the people you trust.\n\nWe obsess over the small things: the Bengali Taka symbol rendering just right, the overpaid state feeling relieved, not alarming, the joy of marking a debt settled. Dena is made to be opened, used in seconds, and closed — with peace of mind.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            SectionHeader("FEATURES")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("•  Two views, one truth — \"I Lent\" and \"I Borrowed\" keep each side of your ledger crisp and separate.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Full history you can edit — every loan starts as its own transaction; tap any entry to correct or delete it and the remaining balance recalculates itself.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Every currency, one tap — searchable picker with dozens of world currencies, defaulting to Bangladeshi Taka (৳), so a loan in dollars or dinar needs no mental math.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Due dates — or none at all — set a deadline or keep the loan beautifully open-ended.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Dressed for your mood — Material You dynamic colors, 20+ curated palettes, light/dark override, and text scaling from small to large.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  English and বাংলা — the whole app speaks the language you trust, with proper Taka formatting.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Yours even after loss — .dena backup & restore, plus per-debt PDF and CSV statements you can share.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Featherweight & fast — 1.3 MB, opens in a blink, runs on Android 7.0+.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            }
 
             SectionHeader("PRINCIPLES")
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("•  Private by default — your debts stay on your device.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text("•  Honest by design — no dark patterns, no paywalls for essentials.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text("•  Calm, not cold — finance without anxiety.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                Text("•  Built to last — export any time as PDF, CSV or .dena backup.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Built to last — no ads, no tracking, no cloud required.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
 
-            // Editable footer hint
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Edit this freely", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Psst — try tapping the DENA title 4 times", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Replace the texts above in SettingsScreen.kt → AboutSubpage with your own story. Version is shown automatically from BuildConfig.",
+                        "Four quick taps on the DENA header in Settings unlocks the Advanced theme engine — dynamic colors, palette picker, and all the hidden customizations. Tap four times again to hide it. A little easter egg for the curious.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
