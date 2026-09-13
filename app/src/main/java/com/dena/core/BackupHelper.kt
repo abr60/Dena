@@ -29,13 +29,16 @@ object BackupHelper {
 
     fun decodeBackupString(input: String): String? {
         val trimmed = input.trim()
+        // Raw JSON (new export format) — return as-is without attempting Base64
+        if (trimmed.startsWith("{")) return trimmed
+        // Legacy Base64 format — strip .dena suffix, decode, verify result is JSON
         val b64 = if (trimmed.endsWith(".dena")) trimmed.removeSuffix(".dena") else trimmed
         return try {
             val bytes = Base64.decode(b64, Base64.NO_WRAP)
-            String(bytes, StandardCharsets.UTF_8)
+            val decoded = String(bytes, StandardCharsets.UTF_8)
+            if (decoded.trimStart().startsWith("{")) decoded else null
         } catch (_: Exception) {
-            // fallback: maybe raw json
-            if (trimmed.trimStart().startsWith("{")) trimmed else null
+            null
         }
     }
 
