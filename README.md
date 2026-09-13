@@ -14,6 +14,7 @@ Local-first debt & borrowing tracker for Android.
 | Main Screen | Settings | Debt Detail |
 | :---: | :---: | :---: |
 | ![Main](screenshots/Screenshot_20260913-125015_Dena.png) | ![Settings](screenshots/Screenshot_20260913-125049_Dena.png) | ![Detail](screenshots/Screenshot_20260913-125054_Dena.png) |
+| ![Screen 4](screenshots/Screenshot_20260913-125057_Dena.png) | ![Screen 5](screenshots/Screenshot_20260913-125344_Dena.png) | ![Screen 6](screenshots/Screenshot_20260913-125403_Dena.png) |
 
 ## Tech
 
