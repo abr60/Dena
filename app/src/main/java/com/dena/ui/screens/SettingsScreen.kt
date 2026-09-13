@@ -179,36 +179,38 @@ fun AppearanceSubpage(
 
             if (isUnlocked) {
                 SectionHeader("ADVANCED")
-                ToggleRow(label = "Dynamic colors (Material You)", caption = "Use wallpaper colors (Android 12+)", checked = themeMode == DenaThemeMode.DYNAMIC, onCheckedChange = {
-                    if (it) {
-                        onThemeChange(DenaThemeMode.DYNAMIC)
-                        onPaletteEnabledChange(false)
-                    } else {
-                        onThemeChange(DenaThemeMode.LIGHT)
-                    }
-                })
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    ToggleRow(label = "Dynamic colors (Material You)", caption = "Use wallpaper colors (Android 12+)", checked = themeMode == DenaThemeMode.DYNAMIC, onCheckedChange = {
+                        if (it) {
+                            onThemeChange(DenaThemeMode.DYNAMIC)
+                            onPaletteEnabledChange(false)
+                        } else {
+                            onThemeChange(DenaThemeMode.LIGHT)
+                        }
+                    })
 
-                if (themeMode == DenaThemeMode.DYNAMIC) {
-                    var showDynamicSchemeSheet by remember { mutableStateOf(false) }
-                    SectionHeader("MATERIAL YOU SCHEME")
-                    SettingsGroup {
-                        Box(modifier = Modifier.fillMaxWidth().clickable { showDynamicSchemeSheet = true }) {
-                            SettingsRow(
-                                label = "Dynamic scheme",
-                                value = when (dynamicScheme) { "light" -> "Light"; "dark" -> "Dark"; else -> "System" },
-                                showDivider = false,
+                    if (themeMode == DenaThemeMode.DYNAMIC) {
+                        var showDynamicSchemeSheet by remember { mutableStateOf(false) }
+                        SectionHeader("MATERIAL YOU SCHEME")
+                        SettingsGroup {
+                            Box(modifier = Modifier.fillMaxWidth().clickable { showDynamicSchemeSheet = true }) {
+                                SettingsRow(
+                                    label = "Dynamic scheme",
+                                    value = when (dynamicScheme) { "light" -> "Light"; "dark" -> "Dark"; else -> "System" },
+                                    showDivider = false,
+                                )
+                            }
+                        }
+                        if (showDynamicSchemeSheet) {
+                            DynamicSchemePickerSheet(
+                                currentScheme = dynamicScheme,
+                                onPick = { picked -> onDynamicSchemeChange(picked); showDynamicSchemeSheet = false },
+                                onDismiss = { showDynamicSchemeSheet = false },
                             )
                         }
                     }
-                    if (showDynamicSchemeSheet) {
-                        DynamicSchemePickerSheet(
-                            currentScheme = dynamicScheme,
-                            onPick = { picked -> onDynamicSchemeChange(picked); showDynamicSchemeSheet = false },
-                            onDismiss = { showDynamicSchemeSheet = false },
-                        )
-                    }
                 }
-
+                
                 SectionHeader("COLOR PALETTE")
                 ToggleRow(label = "Enable Omarchy Palette", caption = "Apply curated color theme", checked = paletteEnabled, onCheckedChange = { 
                     onPaletteEnabledChange(it)
