@@ -1,6 +1,8 @@
 package com.dena.ui.screens
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -144,6 +146,7 @@ fun SettingsScreen(
 
         SettingsGroup {
             NavRow(label = "App Updates", icon = Icons.Filled.SystemUpdate, caption = "v${BuildConfig.VERSION_NAME} • Check for updates", onClick = { subpage = "update" }, showDivider = true)
+            NavRow(label = "Feedback", icon = Icons.Filled.Email, caption = "Report a bug or suggest a feature", onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/abr60/Dena/issues/new/choose"))) }, showDivider = true)
             NavRow(label = "About", icon = Icons.Filled.Info, caption = "Our story, motto & version", onClick = { subpage = "about" })
         }
     }

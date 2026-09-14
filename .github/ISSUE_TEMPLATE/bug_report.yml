@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a bug in Dena
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a bug! Fill in the details below.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug — what you did, what went wrong.
+      placeholder: I opened Settings → ... and expected ... but got ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should have happened?
+      placeholder: The remaining balance should have updated to ...
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce it?
+      placeholder: |
+        1. Go to '...'
+        2. Tap '...'
+        3. See error
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Found in Settings → About (e.g. 0.6.2-alpha, build 9)
+      placeholder: 0.6.2-alpha (build 9)
+    validations:
+      required: false
+  - type: input
+    id: device
+    attributes:
+      label: Device / Android version
+      description: e.g. Pixel 7, Android 14 — helps reproduce device-specific issues.
+      placeholder: Pixel 7, Android 14
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context
+      description: Screenshots, logs, or anything else helpful.
+    validations:
+      required: false

@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.6.3-alpha — 2026-09-14
+- **Feature: feedback** — Settings hub `Feedback` row (Email icon, `ACTION_VIEW https://github.com/abr60/Dena/issues/new/choose`) between App Updates and About, with `.github/ISSUE_TEMPLATE/bug_report.yml` + `feature_request.yml` + `config.yml` so `issues/new/choose` shows two labeled templates.
+
 ## v0.6.2-alpha — 2026-09-14
 - **Fix: settled scroll bug** — `DebtList` `LazyColumn weight(1f)` split screen to 50/50 when `SETTLED` appeared (only 3 active visible). Reverted `DebtList` to `Column`, `ScreenContainer` outer `Column` → `fillMaxSize` + inner `Column(weight(1f).verticalScroll)` as single shared scroll; removed `weight` from `OwedToMeScreen`/`IOweScreen`.
 - **Fix: date picker** — `PaymentModal`/`EditTransactionDialog` date field now `Box(fillMaxWidth.clickable)` + `enabled=false` + disabled colors so whole field triggers `DatePickerDialog`.
