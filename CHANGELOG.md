@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.6.4-alpha — 2026-09-15
+- **New icon** — simple Talom-style launcher icon: flat bold `D` (`#F0F0F0`, same weight/footprint as Talom's `T`) on `#1A1A1A` tile; vector foreground + monochrome, legacy PNGs (mdpi–xxxhdpi, normal + round) regenerated, old `drawable-nodpi` PNG foreground deleted, adaptive `monochrome` layer added.
+
 ## v0.6.3-alpha — 2026-09-14
 - **Feature: feedback** — Settings hub `Feedback` row (Email icon, `ACTION_VIEW https://github.com/abr60/Dena/issues/new/choose`) between App Updates and About, with `.github/ISSUE_TEMPLATE/bug_report.yml` + `feature_request.yml` + `config.yml` so `issues/new/choose` shows two labeled templates.
 
