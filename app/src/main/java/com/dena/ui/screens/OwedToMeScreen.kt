@@ -54,7 +54,7 @@ fun OwedToMeScreen(
             EmptyState(message = "No debts owed to you yet. Tap + to add one.")
         } else {
             if (openDebts.isNotEmpty()) {
-                DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, modifier = Modifier.weight(1f))
+                DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery)
             }
             if (closedDebts.isNotEmpty()) {
                 Text(
@@ -63,7 +63,7 @@ fun OwedToMeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
                 )
-                DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, modifier = Modifier.weight(1f))
+                DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true)
             }
         }
     }

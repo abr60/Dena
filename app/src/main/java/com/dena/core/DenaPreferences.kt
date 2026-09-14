@@ -68,6 +68,15 @@ class DenaPreferences(context: Context) {
     fun getDarkMode(): Boolean = prefs.getBoolean(KEY_DARK_MODE, false)
     fun setDarkMode(v: Boolean) { prefs.edit().putBoolean(KEY_DARK_MODE, v).apply() }
 
+    fun getDismissedUpdateTag(): String = prefs.getString(KEY_DISMISSED_UPDATE_TAG, "") ?: ""
+    fun setDismissedUpdateTag(v: String) { prefs.edit().putString(KEY_DISMISSED_UPDATE_TAG, v).apply() }
+
+    fun getLastUpdateCheck(): Long = prefs.getLong(KEY_LAST_UPDATE_CHECK, 0L)
+    fun setLastUpdateCheck(v: Long) { prefs.edit().putLong(KEY_LAST_UPDATE_CHECK, v).apply() }
+
+    fun getLastNotifiedTag(): String = prefs.getString(KEY_LAST_NOTIFIED_TAG, "") ?: ""
+    fun setLastNotifiedTag(v: String) { prefs.edit().putString(KEY_LAST_NOTIFIED_TAG, v).apply() }
+
     companion object {
         const val PREFS_NAME = "dena_preferences"
         const val KEY_THEME_MODE = "theme_mode"
@@ -87,6 +96,9 @@ class DenaPreferences(context: Context) {
         const val KEY_SHOW_PERCENTAGE = "show_percentage"
         const val KEY_HISTORY_CLEAN_DAYS = "history_clean_days"
         const val KEY_UNLOCKED = "unlocked"
+        const val KEY_DISMISSED_UPDATE_TAG = "dismissed_update_tag"
+        const val KEY_LAST_UPDATE_CHECK = "last_update_check"
+        const val KEY_LAST_NOTIFIED_TAG = "last_notified_tag"
         const val LANG_EN = "en"
         const val LANG_BN = "bn"
         const val CURRENCY_BDT = "BDT"

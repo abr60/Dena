@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.2-alpha — 2026-09-14
+- **Fix: settled scroll bug** — `DebtList` `LazyColumn weight(1f)` split screen to 50/50 when `SETTLED` appeared (only 3 active visible). Reverted `DebtList` to `Column`, `ScreenContainer` outer `Column` → `fillMaxSize` + inner `Column(weight(1f).verticalScroll)` as single shared scroll; removed `weight` from `OwedToMeScreen`/`IOweScreen`.
+- **Fix: date picker** — `PaymentModal`/`EditTransactionDialog` date field now `Box(fillMaxWidth.clickable)` + `enabled=false` + disabled colors so whole field triggers `DatePickerDialog`.
+- **Feature: auto-update** — `POST_NOTIFICATIONS` permission, `UpdateNotifier` channel `dena_updates`, `UpdateAvailableDialog`, `DenaApp` `LaunchedEffect` throttled 12h (`fetchLatest`→`isNewer`→skip dismissed→show dialog + `notifyUpdateAvailable` once per tag). `DenaPreferences` keys `dismissed_update_tag`/`last_update_check`/`last_notified_tag`.
+
 ## v0.6.1-alpha — 2026-09-14
 - **Performance**: `DebtList` → `LazyColumn` with `stickyHeader` date grouping, extracted `DebtCardItem`, `ScreenContainer` exposes `ColumnScope` for weighted lists.
 - **UX polish**: `SummaryBanner` count now `N open debts` (not unique people), removed `+` badge, `DebtFormScreen` redesign (compact header, no-scroll form, 12dp spacing), `ScreenContainer` header 48dp / `DENA` 16sp, search field height-constrained 48dp.

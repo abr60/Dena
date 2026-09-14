@@ -2,6 +2,7 @@ package com.dena.ui.screens
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -476,7 +477,14 @@ fun EditTransactionDialog(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             )
-            Box(modifier = Modifier.fillMaxWidth().clickable { pick() }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { pick() },
+            ) {
                 OutlinedTextField(
                     value = df.format(txDate),
                     onValueChange = {},
@@ -584,14 +592,31 @@ fun PaymentModal(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = df.format(txDate),
-                    onValueChange = {},
-                    label = { Text("Date") },
-                    leadingIcon = { Icon(Icons.Filled.DateRange, null) },
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth().clickable { pick() },
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { pick() },
+                ) {
+                    OutlinedTextField(
+                        value = df.format(txDate),
+                        onValueChange = {},
+                        label = { Text("Date") },
+                        leadingIcon = { Icon(Icons.Filled.DateRange, null) },
+                        readOnly = true,
+                        enabled = false,
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledBorderColor = MaterialTheme.colorScheme.outline,
+                            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                }
             }
         },
         confirmButton = {

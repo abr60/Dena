@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -99,6 +100,9 @@ fun DenaApp(database: DenaDatabase) {
     val countIOwe by viewModel.countIOwe.collectAsStateWithLifecycle()
 
     val prefs = remember(context) { com.dena.core.DenaPreferences(context) }
+    val scope = rememberCoroutineScope()
+    var pendingUpdate by remember { mutableStateOf<com.dena.core.ReleaseInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var settingsTabReselected by rememberSaveable { mutableStateOf(false) }
     var showDebtForm by rememberSaveable { mutableStateOf(false) }
@@ -116,6 +120,26 @@ fun DenaApp(database: DenaDatabase) {
                 fontSize = prefs.getFontSize(),
             )
         )
+    }
+
+    // Auto-check for updates on app open (throttled 12h) — notification + in-app dialog
+    LaunchedEffect(Unit) {
+        val now = System.currentTimeMillis()
+        val last = prefs.getLastUpdateCheck()
+        if (now - last < 12L * 60 * 60 * 1000) return@LaunchedEffect
+        prefs.setLastUpdateCheck(now)
+        val result = com.dena.core.UpdateChecker.fetchLatest()
+        val info = result.getOrNull() ?: return@LaunchedEffect
+        val current = com.dena.BuildConfig.VERSION_NAME
+        if (!com.dena.core.UpdateChecker.isNewer(info.tagName, current)) return@LaunchedEffect
+        if (info.tagName == prefs.getDismissedUpdateTag()) return@LaunchedEffect
+        pendingUpdate = info
+        showUpdateDialog = true
+        // System notification (best-effort; silently no-ops if POST_NOTIFICATIONS denied)
+        if (info.tagName != prefs.getLastNotifiedTag()) {
+            com.dena.core.UpdateNotifier.notifyUpdateAvailable(context, info)
+            prefs.setLastNotifiedTag(info.tagName)
+        }
     }
 
     // Floating action button only on main tabs (not settings)
@@ -219,6 +243,16 @@ fun DenaApp(database: DenaDatabase) {
                         onBack = { selectedDebtId = null },
                     )
                 } else {
+                    if (showUpdateDialog && pendingUpdate != null) {
+                        com.dena.ui.components.UpdateAvailableDialog(
+                            info = pendingUpdate!!,
+                            onDismiss = { showUpdateDialog = false },
+                            onDismissVersion = {
+                                prefs.setDismissedUpdateTag(pendingUpdate!!.tagName)
+                                showUpdateDialog = false
+                            },
+                        )
+                    }
                     Column(modifier = Modifier.fillMaxSize()) {
                         when (selectedTab) {
                             0 -> OwedToMeScreen(
