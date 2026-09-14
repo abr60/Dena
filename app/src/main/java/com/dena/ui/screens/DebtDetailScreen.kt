@@ -1,6 +1,6 @@
 package com.dena.ui.screens
 
-import android.app.DatePickerDialog
+import com.dena.ui.components.DenaDatePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -60,7 +60,6 @@ import com.dena.data.transaction.Transaction
 import com.dena.ui.DebtViewModel
 import com.dena.ui.theme.LocalMoneyPalette
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -401,13 +400,7 @@ fun EditTransactionDialog(
     val context = LocalContext.current
     val df = SimpleDateFormat("MMM d, yyyy", Locale.US)
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    fun pick() {
-        val cal = Calendar.getInstance().apply { timeInMillis = txDate }
-        DatePickerDialog(context, { _, y, m, d ->
-            val c = Calendar.getInstance().apply { set(y, m, d, 12, 0, 0); set(Calendar.MILLISECOND, 0) }
-            txDate = c.timeInMillis
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-    }
+    var showDatePicker by remember { mutableStateOf(false) }
     val typeOptions = if (debtDirection == "owed_to_me") listOf("Debt added", "Payment received") else listOf("Debt added", "Payment made")
     val dirValues = if (debtDirection == "owed_to_me") listOf("debt_added", "payment_received") else listOf("debt_added", "payment_made")
     val selectedIdx = dirValues.indexOf(txDirection).coerceAtLeast(0)
@@ -483,7 +476,7 @@ fun EditTransactionDialog(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                    ) { pick() },
+                    ) { showDatePicker = true },
             ) {
                 OutlinedTextField(
                     value = df.format(txDate),
@@ -535,6 +528,13 @@ fun EditTransactionDialog(
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) } }
         )
     }
+    if (showDatePicker) {
+        DenaDatePickerDialog(
+            initialMillis = txDate,
+            onPick = { txDate = it },
+            onDismiss = { showDatePicker = false },
+        )
+    }
 }
 
 @Composable
@@ -550,13 +550,7 @@ fun PaymentModal(
     var txDate by remember { mutableStateOf(System.currentTimeMillis()) }
     val context = LocalContext.current
     val df = SimpleDateFormat("MMM d, yyyy", Locale.US)
-    fun pick() {
-        val cal = Calendar.getInstance().apply { timeInMillis = txDate }
-        DatePickerDialog(context, { _, y, m, d ->
-            val c = Calendar.getInstance().apply { set(y, m, d, 12, 0, 0); set(Calendar.MILLISECOND, 0) }
-            txDate = c.timeInMillis
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-    }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     val title = if (isAddMore) (if (isOwedToMe) "Lend More" else "Borrow More") else "Log Payment"
     val amountLabel = if (isAddMore) (if (isOwedToMe) "Amount to lend" else "Amount to borrow") else "Amount to log"
@@ -598,7 +592,7 @@ fun PaymentModal(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                        ) { pick() },
+) { showDatePicker = true },
                 ) {
                     OutlinedTextField(
                         value = df.format(txDate),
@@ -632,4 +626,11 @@ fun PaymentModal(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
+    if (showDatePicker) {
+        DenaDatePickerDialog(
+            initialMillis = txDate,
+            onPick = { txDate = it },
+            onDismiss = { showDatePicker = false },
+        )
+    }
 }

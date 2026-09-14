@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.6.5-alpha — 2026-09-15
+- **Modern date picker** — replaced `android.app.DatePickerDialog` (dated white dialog, bar-style header) with Material 3 `DatePicker` in a shared `DenaDatePickerDialog` composable (`surfaceVariant` container matching cards, monochrome-friendly, respects light/dark/palette/dynamic themes, `MMM d, yyyy` + local-noon storage preserved). All 3 sites covered: create-debt creation & due dates, edit-transaction date, log-payment date. Verified on device (Sep 15 round-trip).
+
 ## v0.6.4-alpha — 2026-09-15
 - **New icon** — simple Talom-style launcher icon: flat bold `D` (`#F0F0F0`, same weight/footprint as Talom's `T`) on `#1A1A1A` tile; vector foreground + monochrome, legacy PNGs (mdpi–xxxhdpi, normal + round) regenerated, old `drawable-nodpi` PNG foreground deleted, adaptive `monochrome` layer added.
 

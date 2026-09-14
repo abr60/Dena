@@ -1,6 +1,5 @@
 package com.dena.ui.screens
 
-import android.app.DatePickerDialog
 import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,8 +57,8 @@ import com.dena.core.CurrencyRegistry
 import com.dena.core.DenaPreferences
 import com.dena.ui.DebtViewModel
 import com.dena.ui.components.CurrencyPickerDialog
+import com.dena.ui.components.DenaDatePickerDialog
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -80,6 +79,7 @@ fun DebtFormScreen(
     val prefs = remember(context) { DenaPreferences(context) }
     var currencyCode by remember { mutableStateOf(prefs.getCurrency()) }
     var showCurrencyPicker by remember { mutableStateOf(false) }
+    var datePickerTarget by remember { mutableStateOf<Pair<Long, (Long) -> Unit>?>(null) }
     val symbol = CurrencyRegistry.symbolFor(currencyCode)
     val dateFmt = SimpleDateFormat("MMM d, yyyy", Locale.US)
     val shortDateFmt = SimpleDateFormat("MMM d", Locale.US)
@@ -117,17 +117,6 @@ fun DebtFormScreen(
         else try { contactLauncher.launch(null) } catch (_: Exception) {}
     }
 
-    fun showDatePicker(initial: Long, onPick: (Long) -> Unit) {
-        val cal = Calendar.getInstance().apply { timeInMillis = initial }
-        DatePickerDialog(context, { _, y, m, d ->
-            val c = Calendar.getInstance().apply {
-                set(y, m, d, 12, 0, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            onPick(c.timeInMillis)
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -154,7 +143,7 @@ fun DebtFormScreen(
             )
             // Creation date as compact icon button
             IconButton(
-                onClick = { showDatePicker(creationDate) { creationDate = it } },
+                onClick = { datePickerTarget = creationDate to { creationDate = it } },
             ) {
                 Icon(
                     Icons.Filled.CalendarToday,
@@ -264,9 +253,8 @@ fun DebtFormScreen(
             ) {
                 OutlinedButton(
                     onClick = {
-                        if (!noDueDate) showDatePicker(
-                            dueDate ?: System.currentTimeMillis(),
-                        ) { picked -> dueDate = picked }
+                        if (!noDueDate) datePickerTarget =
+                            (dueDate ?: System.currentTimeMillis()) to { picked -> dueDate = picked }
                     },
                     enabled = !noDueDate,
                     shape = RoundedCornerShape(12.dp),
@@ -363,6 +351,14 @@ fun DebtFormScreen(
                 showCurrencyPicker = false
             },
             onDismiss = { showCurrencyPicker = false },
+        )
+    }
+
+    datePickerTarget?.let { (initial, onPick) ->
+        DenaDatePickerDialog(
+            initialMillis = initial,
+            onPick = onPick,
+            onDismiss = { datePickerTarget = null },
         )
     }
 }
