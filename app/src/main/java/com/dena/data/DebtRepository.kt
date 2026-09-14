@@ -1,8 +1,6 @@
 package com.dena.data
 
 import androidx.room.RoomDatabase
-import androidx.sqlite.db.SimpleSQLiteQuery
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.dena.data.debt.Debt
 import com.dena.data.debt.DebtDao
 import com.dena.data.transaction.Transaction
@@ -22,25 +20,6 @@ class DebtRepository(
     val observeOwedToMe: Flow<List<Debt>> = debtDao.observeOwedToMe()
     val observeIOwe: Flow<List<Debt>> = debtDao.observeIOwe()
     val observeAll: Flow<List<Debt>> = debtDao.observeAll()
-
-    // Summaries
-    suspend fun sumOwedToMe(): Double = debtDao.sumOwedToMe() ?: 0.0
-    suspend fun sumIOwe(): Double = debtDao.sumIOwe() ?: 0.0
-
-    // Counts (fixed: simple COUNT with WHERE, no GROUP BY)
-    suspend fun countOwedToMe(): Int = countDebtsByDirection("owed_to_me")
-    suspend fun countIOwe(): Int = countDebtsByDirection("i_owe")
-
-    private suspend fun countDebtsByDirection(direction: String): Int = withContext(Dispatchers.IO) {
-        val query = SimpleSQLiteQuery("SELECT COUNT(*) FROM debts WHERE direction = ?", arrayOf(direction))
-        val db: SupportSQLiteDatabase = database.openHelper.writableDatabase
-        val cursor = db.query(query)
-        try {
-            if (cursor.moveToNext()) cursor.getInt(0) else 0
-        } finally {
-            cursor.close()
-        }
-    }
 
     // Debt CRUD
     suspend fun insertDebt(debt: Debt): Long = debtDao.insert(debt)

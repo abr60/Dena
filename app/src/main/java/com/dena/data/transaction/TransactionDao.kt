@@ -31,12 +31,6 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<Transaction>>
 
-    @Query("SELECT SUM(amount) FROM transactions WHERE debtId = :debtId AND direction = 'payment_received'")
-    suspend fun sumPaymentsReceived(debtId: Long): Double?
-
-    @Query("SELECT SUM(amount) FROM transactions WHERE debtId = :debtId AND direction = 'payment_made'")
-    suspend fun sumPaymentsMade(debtId: Long): Double?
-
     @Query("SELECT * FROM transactions")
     suspend fun getAllOnce(): List<Transaction>
 }

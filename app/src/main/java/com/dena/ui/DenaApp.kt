@@ -98,21 +98,25 @@ fun DenaApp(database: DenaDatabase) {
     val countOwedToMe by viewModel.countOwedToMe.collectAsStateWithLifecycle()
     val countIOwe by viewModel.countIOwe.collectAsStateWithLifecycle()
 
-    val prefs = remember { com.dena.core.DenaPreferences(context) }
+    val prefs = remember(context) { com.dena.core.DenaPreferences(context) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var settingsTabReselected by rememberSaveable { mutableStateOf(false) }
     var showDebtForm by rememberSaveable { mutableStateOf(false) }
     var selectedDebtId by rememberSaveable { mutableStateOf<Long?>(null) }
-    // Talom clone: Follow System boolean logic — verbatim
-    var followSystemTheme by remember { mutableStateOf(prefs.isFollowSystemTheme()) }
-    var dynamicColorsEnabled by remember { mutableStateOf(prefs.isDynamicColorsEnabled()) }
-    // Pre-Android-10 manual switch (light by default)
-    var manualDark by remember { mutableStateOf(prefs.getDarkMode()) }
-    var themeMode by rememberSaveable { mutableStateOf(prefs.getThemeMode()) }
-    var paletteId by rememberSaveable { mutableStateOf(prefs.getPaletteId()) }
-    var paletteEnabled by rememberSaveable { mutableStateOf(prefs.isPaletteEnabled()) }
-    var dynamicScheme by rememberSaveable { mutableStateOf(prefs.getDynamicScheme()) }
-    var fontSize by rememberSaveable { mutableStateOf(prefs.getFontSize()) }
+    var themeState by remember {
+        mutableStateOf(
+            ThemeState(
+                themeMode = prefs.getThemeMode(),
+                followSystemTheme = prefs.isFollowSystemTheme(),
+                dynamicColorsEnabled = prefs.isDynamicColorsEnabled(),
+                manualDark = prefs.getDarkMode(),
+                paletteId = prefs.getPaletteId(),
+                paletteEnabled = prefs.isPaletteEnabled(),
+                dynamicScheme = prefs.getDynamicScheme(),
+                fontSize = prefs.getFontSize(),
+            )
+        )
+    }
 
     // Floating action button only on main tabs (not settings)
     val showFab = selectedTab < 2
@@ -132,13 +136,13 @@ fun DenaApp(database: DenaDatabase) {
     }
 
     com.dena.ui.theme.DenaTheme(
-        themeMode = themeMode,
-        palette = if (!dynamicColorsEnabled && paletteEnabled) PaletteRegistry.find(paletteId) else null,
-        fontSize = fontSize,
-        dynamicScheme = dynamicScheme,
-        followSystemTheme = followSystemTheme,
-        dynamicColorsEnabled = dynamicColorsEnabled,
-        manualDark = manualDark
+        themeMode = themeState.themeMode,
+        palette = if (!themeState.dynamicColorsEnabled && themeState.paletteEnabled) PaletteRegistry.find(themeState.paletteId) else null,
+        fontSize = themeState.fontSize,
+        dynamicScheme = themeState.dynamicScheme,
+        followSystemTheme = themeState.followSystemTheme,
+        dynamicColorsEnabled = themeState.dynamicColorsEnabled,
+        manualDark = themeState.manualDark
     ) {
         Scaffold(
             bottomBar = {
@@ -230,54 +234,54 @@ fun DenaApp(database: DenaDatabase) {
                                 onDebtClick = { debt -> selectedDebtId = debt.id },
                             )
                                     2 -> SettingsScreen(
-                                        themeMode = themeMode,
+                                        themeMode = themeState.themeMode,
                                         onThemeChange = { newMode ->
-                                            themeMode = newMode
+                                            themeState = themeState.copy(themeMode = newMode)
                                             prefs.setThemeMode(newMode)
                                         },
-                                        // Talom clone: Follow System verbatim
-                                        followSystemTheme = followSystemTheme,
+                                        followSystemTheme = themeState.followSystemTheme,
                                         onFollowSystemThemeChange = { v ->
-                                            followSystemTheme = v
+                                            themeState = themeState.copy(
+                                                followSystemTheme = v,
+                                                themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
+                                            )
                                             prefs.setFollowSystemTheme(v)
-                                            // keep legacy enum in sync for migration
-                                            prefs.setThemeMode(if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT)
-                                            themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
+                                            prefs.setThemeMode(themeState.themeMode)
                                         },
-                                        manualDark = manualDark,
+                                        manualDark = themeState.manualDark,
                                         onDarkModeChange = { v ->
-                                            manualDark = v
+                                            themeState = themeState.copy(manualDark = v)
                                             prefs.setDarkMode(v)
                                         },
-                                        dynamicColorsEnabled = dynamicColorsEnabled,
+                                        dynamicColorsEnabled = themeState.dynamicColorsEnabled,
                                         onDynamicColorsChange = { v ->
-                                            dynamicColorsEnabled = v
+                                            themeState = themeState.copy(
+                                                dynamicColorsEnabled = v,
+                                                paletteEnabled = if (v) false else themeState.paletteEnabled,
+                                                themeMode = if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM
+                                            )
                                             prefs.setDynamicColorsEnabled(v)
-                                            prefs.setThemeMode(if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM)
-                                            themeMode = if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM
-                                            if (v) {
-                                                paletteEnabled = false
-                                                prefs.setPaletteEnabled(false)
-                                            }
+                                            prefs.setThemeMode(themeState.themeMode)
+                                            if (v) prefs.setPaletteEnabled(false)
                                         },
-                                        paletteId = paletteId,
+                                        paletteId = themeState.paletteId,
                                         onPaletteChange = { newId ->
-                                            paletteId = newId
+                                            themeState = themeState.copy(paletteId = newId)
                                             prefs.setPaletteId(newId)
                                         },
-                                        paletteEnabled = paletteEnabled,
+                                        paletteEnabled = themeState.paletteEnabled,
                                         onPaletteEnabledChange = { enabled ->
-                                            paletteEnabled = enabled
+                                            themeState = themeState.copy(paletteEnabled = enabled)
                                             prefs.setPaletteEnabled(enabled)
                                         },
-                                        dynamicScheme = dynamicScheme,
+                                        dynamicScheme = themeState.dynamicScheme,
                                         onDynamicSchemeChange = { newScheme ->
-                                            dynamicScheme = newScheme
+                                            themeState = themeState.copy(dynamicScheme = newScheme)
                                             prefs.setDynamicScheme(newScheme)
                                         },
-                                        fontSize = fontSize,
+                                        fontSize = themeState.fontSize,
                                         onFontSizeChange = { newSize ->
-                                            fontSize = newSize
+                                            themeState = themeState.copy(fontSize = newSize)
                                             prefs.setFontSize(newSize)
                                         },
                                         database = database,

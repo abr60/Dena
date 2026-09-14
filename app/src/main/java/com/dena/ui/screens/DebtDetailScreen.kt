@@ -41,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -100,8 +99,10 @@ fun DebtDetailScreen(
     }
 
     val isOwedToMe = debt.direction == "owed_to_me"
-    val prefs = DenaPreferences(LocalContext.current)
+    val context = LocalContext.current
+    val prefs = remember(context) { DenaPreferences(context) }
     val sym = prefs.getCurrencySymbol()
+    val showDecimals = prefs.showDecimals()
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -127,7 +128,7 @@ fun DebtDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // B. Summary card — monochrome shell, only history keeps red/green
@@ -142,7 +143,6 @@ fun DebtDetailScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                 ) {
-                    val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
                     val settled = debt.principalAmount - debt.remainingBalance
                     Text(
                         text = "Remaining: ${formatSigned(debt.remainingBalance, sym, negative = !isOwedToMe, showDecimals = showDecimals)}",
@@ -234,6 +234,7 @@ fun DebtDetailScreen(
                         TransactionRow(
                             transaction = tx,
                             debtDirection = debt.direction,
+                            showDecimals = showDecimals,
                             onClick = { editingTx = tx }
                         )
                     }
@@ -321,10 +322,11 @@ fun DebtDetailScreen(
 private fun TransactionRow(
     transaction: Transaction,
     debtDirection: String,
+    showDecimals: Boolean,
     onClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val prefs = DenaPreferences(context)
+    val prefs = remember(context) { DenaPreferences(context) }
     val currencySymbol = prefs.getCurrencySymbol()
     val isDebtAdded = transaction.direction == "debt_added"
     val label = when (transaction.direction) {
@@ -333,8 +335,6 @@ private fun TransactionRow(
         "payment_made" -> "Payment made"
         else -> transaction.direction
     }
-    val sign = if (isDebtAdded) "+" else "\u2212"
-    val amountColor = if (isDebtAdded) Color(0xFF81C784) else Color(0xFFE57373)
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
     Card(
@@ -364,7 +364,6 @@ private fun TransactionRow(
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
-                val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
                 val raw = formatCurrencyRaw(transaction.amount, currencySymbol, showDecimals)
                 val moneyPalette = LocalMoneyPalette.current
                 val amountColor = if (isDebtAdded) moneyPalette.positive else moneyPalette.negative

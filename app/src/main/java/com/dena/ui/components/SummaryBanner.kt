@@ -1,19 +1,14 @@
 package com.dena.ui.components
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,13 +25,16 @@ fun SummaryBanner(
     currency: String,
     label: String,
     isOwedToMe: Boolean = true,
-    showPlus: Boolean = false, // I Lent overview: + badge before the total
 ) {
-    val showDecimals = DenaPreferences(LocalContext.current).showDecimals()
+    val context = LocalContext.current
+    val prefs = remember(context) { DenaPreferences(context) }
+    val showDecimals = prefs.showDecimals()
     val amountText = formatSigned(total, currency, negative = !isOwedToMe, showDecimals = showDecimals)
-    val countText = if (count == 0) "no people"
-    else if (count == 1) "across 1 person"
-    else "across $count people"
+    val countText = when (count) {
+        0 -> "no open debts"
+        1 -> "1 open debt"
+        else -> "$count open debts"
+    }
 
     Card(
         modifier = Modifier
@@ -54,37 +52,15 @@ fun SummaryBanner(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
             // Large total — match Debt Tracker font: ~42sp extra bold, tight line height
-            if (showPlus) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(30.dp).padding(end = 4.dp),
-                    )
-                    Text(
-                        text = amountText,
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 44.sp,
-                        letterSpacing = (-0.5).sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            } else {
-                Text(
-                    text = amountText,
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 44.sp,
-                    letterSpacing = (-0.5).sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            Text(
+                text = amountText,
+                fontSize = 42.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 44.sp,
+                letterSpacing = (-0.5).sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+            )
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = countText,

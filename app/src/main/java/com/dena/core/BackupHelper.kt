@@ -18,13 +18,42 @@ object BackupHelper {
     }
 
     fun exportProfileToJson(debts: List<Debt>, txs: List<Transaction>): String {
-        return buildString {
-            append("{\"debts\":")
-            append(debtsToJson(debts))
-            append(",\"transactions\":")
-            append(txsToJson(txs))
-            append("}")
+        val debtsArr = org.json.JSONArray()
+        for (d in debts) {
+            debtsArr.put(org.json.JSONObject().apply {
+                put("id", d.id)
+                put("contactName", d.contactName)
+                put("direction", d.direction)
+                put("principalAmount", d.principalAmount)
+                put("remainingBalance", d.remainingBalance)
+                put("currency", d.currency)
+                put("dateOpened", d.dateOpened)
+                put("dueDate", d.dueDate ?: org.json.JSONObject.NULL)
+                put("category", d.category)
+                put("notes", d.notes)
+                put("isClosed", d.isClosed)
+                put("creationDate", d.creationDate)
+                put("createdAt", d.createdAt)
+                put("updatedAt", d.updatedAt)
+            })
         }
+        val txsArr = org.json.JSONArray()
+        for (t in txs) {
+            txsArr.put(org.json.JSONObject().apply {
+                put("id", t.id)
+                put("debtId", t.debtId)
+                put("amount", t.amount)
+                put("direction", t.direction)
+                put("timestamp", t.timestamp)
+                put("note", t.note)
+                put("stableId", t.stableId)
+            })
+        }
+        val root = org.json.JSONObject().apply {
+            put("debts", debtsArr)
+            put("transactions", txsArr)
+        }
+        return root.toString(2) // 2-space indent
     }
 
     fun decodeBackupString(input: String): String? {

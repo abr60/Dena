@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +33,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dena.BuildConfig
 import com.dena.core.*
 import com.dena.data.DenaDatabase
-import com.dena.ui.components.AppHeader
 import com.dena.ui.components.CurrencyPickerDialog
 import com.dena.ui.components.DenaSelect
 import com.dena.ui.components.LanguagePickerDialog
@@ -105,41 +105,45 @@ fun SettingsScreen(
 
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Box(modifier = Modifier.fillMaxWidth().clickable {
-            val now = System.currentTimeMillis()
-            if (now - lastTapMs > 700) tapCount = 1 else tapCount++
-            lastTapMs = now
-            if (tapCount >= 4) {
-                tapCount = 0
-                lastTapMs = 0L
-                isUnlocked = !isUnlocked
-                prefs.setUnlocked(isUnlocked)
-                Toast.makeText(
-                    context,
-                    if (isUnlocked) "Advanced theme engine unlocked!" else "Advanced theme engine hidden",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }, contentAlignment = androidx.compose.ui.Alignment.Center) {
-            AppHeader(secondary = "")
-        }
-        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(
+            text = "Settings",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    val now = System.currentTimeMillis()
+                    if (now - lastTapMs > 700) tapCount = 1 else tapCount++
+                    lastTapMs = now
+                    if (tapCount >= 4) {
+                        tapCount = 0
+                        lastTapMs = 0L
+                        isUnlocked = !isUnlocked
+                        prefs.setUnlocked(isUnlocked)
+                        Toast.makeText(
+                            context,
+                            if (isUnlocked) "Advanced theme engine unlocked!" else "Advanced theme engine hidden",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                },
+        )
 
         SettingsGroup {
-            NavRow(label = "Appearance", icon = Icons.Filled.Settings, caption = "Theme, scale & colors", onClick = { subpage = "appearance" })
-            NavRow(label = "Language & Formatting", icon = Icons.Filled.Person, caption = "Language, currency, numbers", onClick = { subpage = "userinterface" }, showDivider = true)
+            NavRow(label = "Appearance", icon = Icons.Filled.Palette, caption = "Theme, scale & colors", onClick = { subpage = "appearance" })
+            NavRow(label = "Language & Formatting", icon = Icons.Filled.Language, caption = "Language, currency, numbers", onClick = { subpage = "userinterface" }, showDivider = true)
         }
 
         SettingsGroup {
-            NavRow(label = "Data", icon = Icons.Filled.Info, caption = "Backup & restore", onClick = { showDataSheet = true }, showDivider = true)
+            NavRow(label = "Data", icon = Icons.Filled.Storage, caption = "Backup & restore", onClick = { showDataSheet = true }, showDivider = true)
             NavRow(label = "Recent Activity", icon = Icons.AutoMirrored.Filled.List, caption = "All transactions & retention", onClick = { subpage = "activity" }, showDivider = true)
         }
 
         SettingsGroup {
-            NavRow(label = "App Updates", icon = Icons.Filled.Refresh, caption = "v${BuildConfig.VERSION_NAME} • Check for updates", onClick = { subpage = "update" }, showDivider = true)
+            NavRow(label = "App Updates", icon = Icons.Filled.SystemUpdate, caption = "v${BuildConfig.VERSION_NAME} • Check for updates", onClick = { subpage = "update" }, showDivider = true)
             NavRow(label = "About", icon = Icons.Filled.Info, caption = "Our story, motto & version", onClick = { subpage = "about" })
         }
     }
@@ -366,8 +370,24 @@ fun RecentActivitySubpage(database: DenaDatabase?, onBack: () -> Unit) {
                 }
             }
         }
-        if (filtered.isEmpty()) { val message = if (historyCleanDays > 0) "No activity in the last $historyCleanDays days" else "No transactions yet"; Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        else { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { filtered.forEach { t -> val name = debtsMap.value[t.debtId] ?: "Debt #${t.debtId}"; Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(12.dp)) { Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Column(modifier = Modifier.weight(1f)) { Text("$name • ${t.direction}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(t.note.ifBlank { "—" }, style = MaterialTheme.typography.bodyMedium) }; Column(horizontalAlignment = Alignment.End) { val showDecimals = DenaPreferences(context).showDecimals(); val sym = DenaPreferences(context).getCurrencySymbol(); Text(formatCurrencyRaw(t.amount, sym, showDecimals), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold); Text(formatRelativeDate(t.timestamp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } } } } } }
+        if (filtered.isEmpty()) { val message = if (historyCleanDays > 0) "No activity in the last $historyCleanDays days" else "No transactions yet"; Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val showDecimals = prefs.showDecimals()
+                val sym = prefs.getCurrencySymbol()
+                filtered.forEach { t ->
+                    val name = debtsMap.value[t.debtId] ?: "Debt #${t.debtId}"
+                    ActivityRow(
+                        contactName = name,
+                        direction = t.direction,
+                        note = t.note,
+                        amount = t.amount,
+                        timestamp = t.timestamp,
+                        currencySymbol = sym,
+                        showDecimals = showDecimals,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -410,7 +430,7 @@ fun AboutSubpage(onBack: () -> Unit) {
                 Text("•  Due dates — or none at all — set a deadline or keep the loan beautifully open-ended.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text("•  Dressed for your mood — Material You dynamic colors, 20+ curated palettes, light/dark override, and text scaling from small to large.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text("•  English and বাংলা — the whole app speaks the language you trust, with proper Taka formatting.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                Text("•  Yours even after loss — .dena backup & restore, plus per-debt PDF and CSV statements you can share.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("•  Yours even after loss — JSON backup & restore, plus per-debt PDF and CSV statements you can share.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text("•  Featherweight & fast — 1.3 MB, opens in a blink, runs on Android 7.0+.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
 
@@ -454,7 +474,7 @@ fun DataBackupBottomSheet(database: DenaDatabase?, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val contentResolver = context.contentResolver
-    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
                 try {
@@ -462,7 +482,7 @@ fun DataBackupBottomSheet(database: DenaDatabase?, onDismiss: () -> Unit) {
                     val txs = database?.transactionDao()?.getAllOnce() ?: emptyList()
                     val json = BackupHelper.exportProfileToJson(debts, txs)
                     contentResolver.openOutputStream(uri)?.use { output -> output.write(json.toByteArray()) }
-                    val filename = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.dena"
+                    val filename = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.json"
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, "Backup saved as $filename to your chosen location", Toast.LENGTH_LONG).show()
                     }
@@ -539,13 +559,16 @@ fun DataBackupBottomSheet(database: DenaDatabase?, onDismiss: () -> Unit) {
         ) {
             Text("Backup & Restore", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                text = "Saves and restores all debts, transactions, and settings as a .dena file.",
+                text = "Saves and restores all debts, transactions, and settings as a JSON file.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
             Button(
-                onClick = { exportLauncher.launch("dena-backup-${System.currentTimeMillis()}.dena") },
+                onClick = {
+                    val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                    exportLauncher.launch("dena-backup-$today.json")
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Export Backup", fontWeight = FontWeight.SemiBold) }
@@ -555,6 +578,57 @@ fun DataBackupBottomSheet(database: DenaDatabase?, onDismiss: () -> Unit) {
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Restore Backup", fontWeight = FontWeight.Medium) }
             Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun ActivityRow(
+    contactName: String,
+    direction: String,
+    note: String,
+    amount: Double,
+    timestamp: Long,
+    currencySymbol: String,
+    showDecimals: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "$contactName • $direction",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = note.ifBlank { "—" },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = formatCurrencyRaw(amount, currencySymbol, showDecimals),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = formatRelativeDate(timestamp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

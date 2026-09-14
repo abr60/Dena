@@ -8,7 +8,7 @@ data class Transaction(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val debtId: Long,
     val amount: Double, // Positive number
-    val direction: String, // "payment_received" (they paid you) or "payment_made" (you paid them)
+    val direction: String, // "debt_added" | "payment_received" (they paid you) | "payment_made" (you paid them)
     val timestamp: Long,
     val note: String,
     val stableId: String, // For dedup

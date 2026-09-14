@@ -77,6 +77,7 @@ fun AppHeader(secondary: String) {
             fontWeight = FontWeight.Medium,
             letterSpacing = 3.sp,
             color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f),
         )
         Text(

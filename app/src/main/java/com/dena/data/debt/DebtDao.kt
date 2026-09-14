@@ -31,18 +31,6 @@ interface DebtDao {
     @Query("SELECT * FROM debts WHERE id = :id")
     suspend fun getById(id: Long): Debt?
 
-    @Query("SELECT SUM(remainingBalance) FROM debts WHERE direction = 'owed_to_me'")
-    suspend fun sumOwedToMe(): Double?
-
-    @Query("SELECT SUM(remainingBalance) FROM debts WHERE direction = 'i_owe'")
-    suspend fun sumIOwe(): Double?
-
-    @Query("SELECT COUNT(*) FROM debts WHERE direction = 'owed_to_me' GROUP BY contactName")
-    suspend fun countUniqueDebtors(): Int
-
-    @Query("SELECT COUNT(*) FROM debts WHERE direction = 'i_owe' GROUP BY contactName")
-    suspend fun countUniqueCreditors(): Int
-
     @Query("SELECT * FROM debts")
     suspend fun getAllOnce(): List<Debt>
 }

@@ -20,7 +20,8 @@ object StatementExport {
         val txHeader = "\nTransactions: Date,Direction,Amount,Note\n"
         val txLines = txs.joinToString("\n") { t -> "${df.format(t.timestamp)},${t.direction},${t.amount},\"${t.note.replace("\"","\"\"")}\"" }
         val csv = header + debtLine + txHeader + txLines + "\n\nFinal balance: $sym ${debt.remainingBalance}\n"
-        val file = File(context.getExternalFilesDir(null), "dena-${debt.contactName}-${System.currentTimeMillis()}.csv")
+        val dateTag = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(System.currentTimeMillis())
+        val file = File(context.getExternalFilesDir(null), "dena-${debt.contactName}-$dateTag.csv")
         file.writeText(csv)
         Toast.makeText(context, "CSV saved: ${file.absolutePath}", Toast.LENGTH_LONG).show()
         // share
@@ -68,7 +69,8 @@ object StatementExport {
         canvas.drawText("Final balance: $sym ${String.format(Locale.US, pat, debt.remainingBalance)}", 40f, y, boldPaint)
         doc.finishPage(page)
         try {
-            val file = File(context.getExternalFilesDir(null), "dena-${debt.contactName}-${System.currentTimeMillis()}.pdf")
+            val dateTag = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(System.currentTimeMillis())
+            val file = File(context.getExternalFilesDir(null), "dena-${debt.contactName}-$dateTag.pdf")
             doc.writeTo(file.outputStream())
             Toast.makeText(context, "PDF saved: ${file.absolutePath}", Toast.LENGTH_LONG).show()
             try {

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.1-alpha — 2026-09-14
+- **Performance**: `DebtList` → `LazyColumn` with `stickyHeader` date grouping, extracted `DebtCardItem`, `ScreenContainer` exposes `ColumnScope` for weighted lists.
+- **UX polish**: `SummaryBanner` count now `N open debts` (not unique people), removed `+` badge, `DebtFormScreen` redesign (compact header, no-scroll form, 12dp spacing), `ScreenContainer` header 48dp / `DENA` 16sp, search field height-constrained 48dp.
+- **Settings**: hub icons `Palette`/`Language`/`Storage`/`SystemUpdate` (requires `material-icons-extended`), spacing `24dp` / top `12dp`, `RecentActivity` → `ActivityRow` hoisted prefs.
+- **Fixes**: `DenaPreferences` wrapped in `remember(context)` in `DebtList`, `DebtDetailScreen` (incl. `TransactionRow`), `SummaryBanner`, `DenaApp`; `DebtViewModel` counts open debts (not distinct names); removed unused `TransactionRow` `sign`/`amountColor` + dead `formatCurrency` helpers; theme `MoneyPalette` remembers palette; `ThemeState` consolidation.
+- **Export**: backup JSON pretty-printed 2-space, `.json` + `application/json` MIME, date-named `dena-backup-YYYY-MM-DD.json`; statement CSV/PDF date-named.
+
 ## v0.6.0-alpha — 2026-09-13
 - **Auto close/reopen**: `isClosed` flag (balance ≤ 0.005 → `SETTLED` greyed section, reopen on new transaction) + `MIGRATION_1_2` clamping legacy overpaid rows to 0, single `recalculateDebtBalance()` choke point, summaries exclude closed.
 - **No overpaying status**: `remainingBalance` clamped at 0; repository + UI guards block amounts exceeding `remaining + 0.005`; "Overpaid" visuals removed.

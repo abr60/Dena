@@ -46,14 +46,14 @@ class DebtViewModel(
             repository.observeOwedToMe.collect { debts ->
                 _owedToMe.value = debts
                 _summaryOwedToMe.value = debts.filter { !it.isClosed }.sumOf { it.remainingBalance }
-                _countOwedToMe.value = debts.filter { !it.isClosed }.map { it.contactName }.distinct().size
+                _countOwedToMe.value = debts.count { !it.isClosed }
             }
         }
         viewModelScope.launch {
             repository.observeIOwe.collect { debts ->
                 _iOwe.value = debts
                 _summaryIOwe.value = debts.filter { !it.isClosed }.sumOf { it.remainingBalance }
-                _countIOwe.value = debts.filter { !it.isClosed }.map { it.contactName }.distinct().size
+                _countIOwe.value = debts.count { !it.isClosed }
             }
         }
     }

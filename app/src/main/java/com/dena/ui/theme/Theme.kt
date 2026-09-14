@@ -190,9 +190,24 @@ fun DenaTheme(
     val scale = fontScaleFor(fontSize)
     val scaledDensity = Density(baseDensity.density, baseDensity.fontScale * scale)
 
-    CompositionLocalProvider(LocalDensity provides scaledDensity) {
-        androidx.compose.runtime.CompositionLocalProvider(LocalMoneyPalette provides MoneyPalette(Color(0xFF81C784), Color(0xFFE57373))) {
-            MaterialTheme(colorScheme = colorScheme, content = content)
+    val moneyPalette = remember(palette) {
+        if (palette != null) {
+            MoneyPalette(
+                positive = palette.tokens.green,
+                negative = palette.tokens.red,
+            )
+        } else {
+            MoneyPalette(
+                positive = Color(0xFF81C784),
+                negative = Color(0xFFE57373),
+            )
         }
+    }
+
+    CompositionLocalProvider(
+        LocalDensity provides scaledDensity,
+        LocalMoneyPalette provides moneyPalette,
+    ) {
+        MaterialTheme(colorScheme = colorScheme, content = content)
     }
 }

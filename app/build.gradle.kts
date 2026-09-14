@@ -14,8 +14,8 @@ android {
         applicationId = "com.dena"
         minSdk = 24 // floor: LocaleHelper (LocaleList/setLocales) — do not raise (see AGENTS.md)
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.6.0-alpha"
+        versionCode = 8
+        versionName = "0.6.1-alpha"
         resourceConfigurations += listOf("en", "bn") // prunes unused locales from deps — part of 1.3 MB win
     }
 
@@ -96,7 +96,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling-preview") // must stay debugImplementation (AGENTS.md)
     debugImplementation("androidx.compose.ui:ui-tooling")
 
