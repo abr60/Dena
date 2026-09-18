@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.6.7-alpha — 2026-09-18
+- **Tab icons swap** — `I Borrowed` now uses the list icon, `I Lent` uses the person icon (positions unchanged).
+
 ## v0.6.6-alpha — 2026-09-18
 - **Bottom nav swap** — `I Borrowed` now first tab, `I Lent` second (`DenaApp` destinations + tab mapping + FAB default updated).
 - **Sort menu** — single sort icon in a right-aligned row beneath the overview card (was per-section); options: Newest first (default), Low to high, High to low (by remaining balance), disabled `Category` placeholder for future filtering. Sort state hoisted per tab so open + settled lists stay consistent.

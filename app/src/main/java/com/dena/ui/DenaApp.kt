@@ -81,8 +81,8 @@ private data class DenaDestination(
 )
 
 private val Destinations = listOf(
-    DenaDestination("I Borrowed", Icons.Filled.Person),
-    DenaDestination("I Lent", Icons.AutoMirrored.Filled.List),
+    DenaDestination("I Borrowed", Icons.AutoMirrored.Filled.List),
+    DenaDestination("I Lent", Icons.Filled.Person),
     DenaDestination("Settings", Icons.Filled.Settings),
 )
 
