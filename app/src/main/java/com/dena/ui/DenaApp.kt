@@ -81,8 +81,8 @@ private data class DenaDestination(
 )
 
 private val Destinations = listOf(
-    DenaDestination("I Lent", Icons.AutoMirrored.Filled.List),
     DenaDestination("I Borrowed", Icons.Filled.Person),
+    DenaDestination("I Lent", Icons.AutoMirrored.Filled.List),
     DenaDestination("Settings", Icons.Filled.Settings),
 )
 
@@ -234,7 +234,7 @@ fun DenaApp(database: DenaDatabase) {
                     DebtFormScreen(
                         viewModel = viewModel, 
                         onBack = { showDebtForm = false },
-                        initialIsOwedToMe = selectedTab == 0
+                        initialIsOwedToMe = selectedTab == 1
                     )
                 } else if (selectedDebtId != null) {
                     DebtDetailScreen(
@@ -255,16 +255,16 @@ fun DenaApp(database: DenaDatabase) {
                     }
                     Column(modifier = Modifier.fillMaxSize()) {
                         when (selectedTab) {
-                            0 -> OwedToMeScreen(
-                                viewModel = viewModel,
-                                summaryTotal = summaryOwedToMe,
-                                summaryCount = countOwedToMe,
-                                onDebtClick = { debt -> selectedDebtId = debt.id },
-                            )
-                            1 -> IOweScreen(
+                            0 -> IOweScreen(
                                 viewModel = viewModel,
                                 summaryTotal = summaryIOwe,
                                 summaryCount = countIOwe,
+                                onDebtClick = { debt -> selectedDebtId = debt.id },
+                            )
+                            1 -> OwedToMeScreen(
+                                viewModel = viewModel,
+                                summaryTotal = summaryOwedToMe,
+                                summaryCount = countOwedToMe,
                                 onDebtClick = { debt -> selectedDebtId = debt.id },
                             )
                                     2 -> SettingsScreen(

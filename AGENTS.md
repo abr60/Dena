@@ -29,8 +29,9 @@ Rules that preserve this:
 
 - Keystore: `~/.keystores/central-release.keystore`, alias `dena` (env: `CENTRAL_RELEASE_STORE_FILE`, `DENA_RELEASE_KEY_ALIAS`, passwords via env/gradle props). Never commit `*.jks`/`*.keystore`, never mention keystore path/alias in release notes.
 - Bump `versionCode` + `versionName` in `app/build.gradle.kts`.
-- Build: `./gradlew :app:assembleRelease` → verify `apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk` (CN=Dena).
-- Publish: `gh release create vX.Y.Z ... app/build/outputs/apk/release/app-release.apk` — use a notes file, not inline ` --notes "…` with backticks.
+- Release via `./release.sh [--notes-file FILE] [--draft]`: builds, verifies signature (CN=Dena), renames the artifact, and publishes.
+- **Asset naming convention: `Dena-vX.Y.Z.apk`** (e.g. `Dena-v0.6.5-alpha.apk`) — title-case app name + leading-v version matching the tag. Never upload the raw `app-release.apk` to a release.
+- Manual fallback: `./gradlew :app:assembleRelease` → verify `apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk` (CN=Dena) → `cp` to `Dena-vX.Y.Z.apk` → publish with `gh release create vX.Y.Z ... Dena-vX.Y.Z.apk` — use a notes file, not inline ` --notes "…` with backticks.
 
 ## Theme notes
 

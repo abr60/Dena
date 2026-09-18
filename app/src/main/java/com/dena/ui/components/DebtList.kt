@@ -10,11 +10,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -46,6 +56,54 @@ private fun sectionHeader(millis: Long): String {
     return SimpleDateFormat("MMM d, yyyy", Locale.US).format(millis).uppercase(Locale.US)
 }
 
+enum class DebtSort(val label: String) {
+    NEWEST("Newest first"),
+    AMOUNT_ASC("Low to high"),
+    AMOUNT_DESC("High to low"),
+    CATEGORY("Category"),
+}
+
+@Composable
+fun SortMenuButton(
+    sort: DebtSort,
+    onSortChange: (DebtSort) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(28.dp),
+        ) {
+            Icon(
+                Icons.Filled.Sort,
+                contentDescription = "Sort",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DebtSort.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    leadingIcon = if (option == sort) {
+                        { Icon(Icons.Filled.Check, contentDescription = null) }
+                    } else null,
+                    // Placeholder for future category filtering — visible but not selectable yet
+                    enabled = option != DebtSort.CATEGORY,
+                    onClick = {
+                        onSortChange(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun DebtList(
     debts: List<Debt>,
@@ -53,6 +111,7 @@ fun DebtList(
     searchQuery: String = "",
     closed: Boolean = false, // settled rows: greyed out, tappable to view/edit
     modifier: Modifier = Modifier,
+    sort: DebtSort = DebtSort.NEWEST,
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
@@ -75,9 +134,17 @@ fun DebtList(
         )
         return
     }
+    // Sort first, then group by day (group order follows first appearance)
+    val sorted = remember(filtered, sort) {
+        when (sort) {
+            DebtSort.NEWEST, DebtSort.CATEGORY -> filtered.sortedByDescending { it.dateOpened }
+            DebtSort.AMOUNT_ASC -> filtered.sortedBy { it.remainingBalance }
+            DebtSort.AMOUNT_DESC -> filtered.sortedByDescending { it.remainingBalance }
+        }
+    }
     // Group by day — like Debt Tracker TODAY
-    val grouped = remember(filtered) {
-        filtered.sortedByDescending { it.dateOpened }.groupBy { sectionHeader(it.dateOpened) }
+    val grouped = remember(sorted) {
+        sorted.groupBy { sectionHeader(it.dateOpened) }
     }
 
     Column(

@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -169,13 +170,12 @@ fun DebtFormScreen(
                 .padding(top = 16.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Contact name
+            // Contact name — leading icon opens device contacts, field still allows manual typing
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text(stringResource(R.string.contact_name)) },
-                leadingIcon = { Icon(Icons.Filled.Person, null) },
-                trailingIcon = {
+                leadingIcon = {
                     IconButton(onClick = {
                         permLauncher.launch(android.Manifest.permission.READ_CONTACTS)
                     }) {
@@ -234,13 +234,15 @@ fun DebtFormScreen(
                     onClick = { showCurrencyPicker = true },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
-                        .width(72.dp)
+                        .width(64.dp)
                         .height(56.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Text(
-                        currencyCode,
-                        style = MaterialTheme.typography.labelMedium,
+                        symbol,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
                     )
                 }
             }

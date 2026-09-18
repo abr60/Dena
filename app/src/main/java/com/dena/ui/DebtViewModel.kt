@@ -111,6 +111,16 @@ class DebtViewModel(
         }
     }
 
+    fun renameDebt(debt: Debt, newName: String) {
+        val trimmed = newName.trim()
+        if (trimmed.isBlank() || trimmed == debt.contactName) return
+        viewModelScope.launch {
+            repository.updateDebt(
+                debt.copy(contactName = trimmed, updatedAt = System.currentTimeMillis()),
+            )
+        }
+    }
+
     fun recordPayment(debtId: Long, amount: Double, note: String, timestamp: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
             repository.recordPayment(debtId, amount, note, timestamp)

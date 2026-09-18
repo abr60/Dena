@@ -1,5 +1,8 @@
 package com.dena.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,6 +22,8 @@ import com.dena.core.DenaPreferences
 import com.dena.data.debt.Debt
 import com.dena.ui.DebtViewModel
 import com.dena.ui.components.DebtList
+import com.dena.ui.components.DebtSort
+import com.dena.ui.components.SortMenuButton
 import com.dena.ui.components.EmptyState
 import com.dena.ui.components.ScreenContainer
 import com.dena.ui.components.SummaryBanner
@@ -32,6 +37,7 @@ fun OwedToMeScreen(
 ) {
     val debts by viewModel.owedToMe.collectAsStateWithLifecycle()
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var sort by remember { mutableStateOf(DebtSort.NEWEST) }
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
     val symbol = prefs.getCurrencySymbol()
@@ -53,8 +59,14 @@ fun OwedToMeScreen(
         if (debts.isEmpty()) {
             EmptyState(message = "No debts owed to you yet. Tap + to add one.")
         } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                SortMenuButton(sort = sort, onSortChange = { sort = it })
+            }
             if (openDebts.isNotEmpty()) {
-                DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery)
+                DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort)
             }
             if (closedDebts.isNotEmpty()) {
                 Text(
@@ -63,7 +75,7 @@ fun OwedToMeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
                 )
-                DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true)
+                DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort)
             }
         }
     }

@@ -1,7 +1,9 @@
 package com.dena.ui.screens
 
 import com.dena.ui.components.DenaDatePickerDialog
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,7 +46,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,7 +66,7 @@ import com.dena.ui.theme.LocalMoneyPalette
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DebtDetailScreen(
     debtId: Long,
@@ -80,7 +84,6 @@ fun DebtDetailScreen(
     var showExportSheet by remember { mutableStateOf(false) }
     var paymentIsAddMore by remember { mutableStateOf(false) }
     var editingTx by remember { mutableStateOf<Transaction?>(null) }
-
     if (debt == null) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
@@ -100,6 +103,13 @@ fun DebtDetailScreen(
 
     val isOwedToMe = debt.direction == "owed_to_me"
     val context = LocalContext.current
+    var editingName by remember(debt.id) { mutableStateOf(false) }
+    var editName by remember(debt.id) { mutableStateOf(debt.contactName) }
+    fun commitRename() {
+        editingName = false
+        viewModel.renameDebt(debt, editName)
+        editName = editName.trim().ifBlank { debt.contactName }
+    }
     val prefs = remember(context) { DenaPreferences(context) }
     val sym = prefs.getCurrencySymbol()
     val showDecimals = prefs.showDecimals()
@@ -107,7 +117,30 @@ fun DebtDetailScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.CenterAlignedTopAppBar(
-            title = { Text(debt.contactName) },
+            title = {
+                if (editingName) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { commitRename() }),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                } else {
+                    Text(
+                        debt.contactName,
+                        modifier = Modifier.combinedClickable(
+                            onClick = {},
+                            onDoubleClick = {
+                                editName = debt.contactName
+                                editingName = true
+                            },
+                        ),
+                    )
+                }
+            },
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

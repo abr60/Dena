@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.6-alpha — 2026-09-18
+- **Bottom nav swap** — `I Borrowed` now first tab, `I Lent` second (`DenaApp` destinations + tab mapping + FAB default updated).
+- **Sort menu** — single sort icon in a right-aligned row beneath the overview card (was per-section); options: Newest first (default), Low to high, High to low (by remaining balance), disabled `Category` placeholder for future filtering. Sort state hoisted per tab so open + settled lists stay consistent.
+- **Rename on Debt Details** — double-tap the contact name in the detail top bar to edit inline (Done saves, blank ignored); removed from main-list cards and Recent Activity rows.
+- **Create Debt polish** — contact picker moved from standalone right icon to the leading icon inside the Contact Name field (manual typing still works); currency button now shows the symbol (e.g. `৳`) instead of the code, sized 64×56dp to match the amount field.
+- **Release process** — new `release.sh` (build → `apksigner` verify `CN=Dena` → publish); asset naming convention `Dena-vX.Y.Z.apk`, never raw `app-release.apk`.
+
 ## v0.6.5-alpha — 2026-09-15
 - **Modern date picker** — replaced `android.app.DatePickerDialog` (dated white dialog, bar-style header) with Material 3 `DatePicker` in a shared `DenaDatePickerDialog` composable (`surfaceVariant` container matching cards, monochrome-friendly, respects light/dark/palette/dynamic themes, `MMM d, yyyy` + local-noon storage preserved). All 3 sites covered: create-debt creation & due dates, edit-transaction date, log-payment date. Verified on device (Sep 15 round-trip).
 
