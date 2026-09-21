@@ -70,6 +70,7 @@ class DebtViewModel(
         dueDate: Long?,
         dateOpened: Long = System.currentTimeMillis(),
         creationDate: Long = System.currentTimeMillis(),
+        contactPhone: String? = null,
     ) {
         viewModelScope.launch {
             val debt = Debt.fromDomain(
@@ -82,6 +83,7 @@ class DebtViewModel(
                 dueDate = dueDate,
                 category = category,
                 notes = notes,
+                contactPhone = contactPhone?.takeIf { it.isNotBlank() },
                 creationDate = creationDate,
             )
             val newId = repository.insertDebt(debt)
@@ -117,6 +119,26 @@ class DebtViewModel(
         viewModelScope.launch {
             repository.updateDebt(
                 debt.copy(contactName = trimmed, updatedAt = System.currentTimeMillis()),
+            )
+        }
+    }
+
+    fun updateContactPhone(debt: Debt, rawPhone: String) {
+        val trimmed = rawPhone.trim()
+        val normalized = trimmed.takeIf { it.isNotBlank() }
+        if (normalized == debt.contactPhone) return
+        viewModelScope.launch {
+            repository.updateDebt(
+                debt.copy(contactPhone = normalized, updatedAt = System.currentTimeMillis()),
+            )
+        }
+    }
+
+    fun swapDirection(debt: Debt) {
+        val newDir = if (debt.direction == "owed_to_me") "i_owe" else "owed_to_me"
+        viewModelScope.launch {
+            repository.updateDebt(
+                debt.copy(direction = newDir, updatedAt = System.currentTimeMillis()),
             )
         }
     }

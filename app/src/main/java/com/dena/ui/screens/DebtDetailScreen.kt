@@ -19,10 +19,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -65,6 +67,7 @@ import com.dena.data.transaction.Transaction
 import com.dena.ui.DebtViewModel
 import com.dena.ui.theme.LocalMoneyPalette
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -83,6 +86,9 @@ fun DebtDetailScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showPaymentModal by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
+    var showMessageSheet by remember { mutableStateOf(false) }
+    var showSwapConfirm by remember { mutableStateOf(false) }
+    var showPhoneEdit by remember { mutableStateOf(false) }
     var paymentIsAddMore by remember { mutableStateOf(false) }
     var editingTx by remember { mutableStateOf<Transaction?>(null) }
     if (debt == null) {
@@ -148,7 +154,12 @@ fun DebtDetailScreen(
                 }
             },
             actions = {
-                val ctx = LocalContext.current
+                IconButton(onClick = { showSwapConfirm = true }) {
+                    Icon(Icons.Filled.SwapHoriz, contentDescription = "Switch I Lent / I Borrowed")
+                }
+                IconButton(onClick = { showMessageSheet = true }) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
+                }
                 IconButton(onClick = { showExportSheet = true }) {
                     Icon(Icons.Filled.Share, contentDescription = "Export")
                 }
@@ -214,6 +225,16 @@ fun DebtDetailScreen(
                             text = "Due: ${formatRelativeDate(debt.dueDate!!)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { showPhoneEdit = true }.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = if (!debt.contactPhone.isNullOrBlank()) "Phone: ${debt.contactPhone}" else "Add phone number",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (!debt.contactPhone.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                         )
                     }
                     if (debt.notes.isNotBlank()) {
@@ -335,29 +356,55 @@ fun DebtDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                 ) { Text("Export as CSV") }
-                if (isOwedToMe) {
-                    OutlinedButton(
-                        onClick = {
-                            val phone = debt.contactPhone?.takeIf { it.isNotBlank() } ?: ""
-                            val remaining = formatCurrencyRaw(debt.remainingBalance, sym, showDecimals)
-                            val message = "Hi ${debt.contactName}, just a reminder that you owe me $remaining. Please settle when convenient. - sent via Dena"
-                            val uri = if (phone.isNotBlank()) {
-                                android.net.Uri.parse("smsto:$phone")
-                            } else {
-                                android.net.Uri.parse("smsto:")
-                            }
-                            val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO, uri).apply {
-                                putExtra("sms_body", message)
-                            }
-                            try { ctx.startActivity(intent) } catch (_: Exception) {}
-                            showExportSheet = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                    ) { Text("Send Message to ${debt.contactName}") }
-                }
             }
         }
+    }
+
+    if (showSwapConfirm) {
+        val targetLabel = if (isOwedToMe) "I Borrowed" else "I Lent"
+        AlertDialog(
+            onDismissRequest = { showSwapConfirm = false },
+            title = { Text("Switch direction?") },
+            text = { Text("Move \"${debt.contactName}\" to $targetLabel? Amount and history stay the same.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.swapDirection(debt); showSwapConfirm = false }) { Text("Switch") }
+            },
+            dismissButton = { TextButton(onClick = { showSwapConfirm = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
+    if (showPhoneEdit) {
+        var phoneDraft by remember(debt.id, debt.contactPhone) { mutableStateOf(debt.contactPhone ?: "") }
+        AlertDialog(
+            onDismissRequest = { showPhoneEdit = false },
+            title = { Text("Phone number") },
+            text = {
+                OutlinedTextField(
+                    value = phoneDraft,
+                    onValueChange = { phoneDraft = it },
+                    label = { Text("Phone") },
+                    placeholder = { Text("017... or +880...") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.updateContactPhone(debt, phoneDraft); showPhoneEdit = false }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = { TextButton(onClick = { showPhoneEdit = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
+    if (showMessageSheet) {
+        MessageSheet(
+            debt = debt,
+            remainingText = formatCurrencyRaw(debt.remainingBalance, sym, showDecimals),
+            dueDate = debt.dueDate,
+            onDismiss = { showMessageSheet = false },
+            onSavePhone = { newPhone -> viewModel.updateContactPhone(debt, newPhone) },
+        )
     }
 
     editingTx?.let { tx ->
@@ -375,6 +422,107 @@ fun DebtDetailScreen(
                 editingTx = null
             }
         )
+    }
+}
+
+private fun buildReminderMessage(firstName: String, amount: String, isOwedToMe: Boolean, dueDate: Long?): String {
+    val duePart = dueDate?.let { " — due ${SimpleDateFormat("dd MMM yyyy", Locale.US).format(Date(it))}" } ?: ""
+    return if (isOwedToMe) {
+        if (dueDate != null) "Hi $firstName,\n\njust a friendly reminder that $amount to me is still outstanding — it was due ${SimpleDateFormat("dd MMM yyyy", Locale.US).format(Date(dueDate))}. Could you settle when convenient?\n\nThank you!"
+        else "Hi $firstName,\n\njust a friendly reminder that $amount to me is still outstanding. Could you settle when convenient?\n\nThank you!"
+    } else {
+        "Hi $firstName,\n\nquick heads-up — I owe you $amount$duePart. Repaying soon, thanks for your patience!"
+    }
+}
+
+private fun sanitizeForSms(raw: String): String = raw.trim()
+private fun sanitizeForWa(raw: String): String {
+    var d = raw.filter { it.isDigit() }
+    if (d.startsWith("0") && d.length >= 11) d = "880" + d.drop(1)
+    return d
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MessageSheet(
+    debt: com.dena.data.debt.Debt,
+    remainingText: String,
+    dueDate: Long?,
+    onDismiss: () -> Unit,
+    onSavePhone: (String) -> Unit,
+) {
+    val ctx = LocalContext.current
+    val isOwedToMe = debt.direction == "owed_to_me"
+    val firstName = debt.contactName.trim().substringBefore(" ").takeIf { it.isNotBlank() } ?: debt.contactName
+    var phone by remember(debt.id) { mutableStateOf(debt.contactPhone ?: "") }
+    var channel by remember { mutableStateOf("sms") } // sms | wa
+    var message by remember(debt.id, dueDate, remainingText) { mutableStateOf(buildReminderMessage(firstName, remainingText, isOwedToMe, dueDate)) }
+    val hasPhone = phone.trim().isNotBlank()
+
+    ModalBottomSheet(onDismissRequest = onDismiss, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Message $firstName", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it },
+                label = { Text("Phone number") },
+                placeholder = { Text("017... or +880...") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val smsSel = channel == "sms"
+                val waSel = channel == "wa"
+                OutlinedButton(
+                    onClick = { channel = "sms" },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = if (smsSel) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors(),
+                ) { Text("SMS") }
+                OutlinedButton(
+                    onClick = { channel = "wa" },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = if (waSel) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors(),
+                ) { Text("WhatsApp") }
+            }
+            OutlinedTextField(
+                value = message,
+                onValueChange = { message = it },
+                label = { Text("Message") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                minLines = 3,
+                maxLines = 6,
+            )
+            Button(
+                onClick = {
+                    val trimmedPhone = phone.trim()
+                    if (trimmedPhone.isNotBlank() && trimmedPhone != debt.contactPhone) onSavePhone(trimmedPhone)
+                    try {
+                        if (channel == "wa") {
+                            val waDigits = sanitizeForWa(trimmedPhone)
+                            if (waDigits.isBlank()) throw IllegalArgumentException("Missing phone")
+                            val enc = java.net.URLEncoder.encode(message, "UTF-8")
+                            val uri = android.net.Uri.parse("https://wa.me/$waDigits?text=$enc")
+                            ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+                        } else {
+                            val smsPhone = sanitizeForSms(trimmedPhone)
+                            val uri = if (smsPhone.isNotBlank()) android.net.Uri.parse("smsto:$smsPhone") else android.net.Uri.parse("smsto:")
+                            val i = android.content.Intent(android.content.Intent.ACTION_SENDTO, uri).apply { putExtra("sms_body", message) }
+                            ctx.startActivity(i)
+                        }
+                    } catch (_: Exception) {}
+                    onDismiss()
+                },
+                enabled = hasPhone && message.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) { Text(if (channel == "wa") "Send via WhatsApp" else "Send via SMS") }
+            if (!hasPhone) Text("Add a phone number to send directly to $firstName.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

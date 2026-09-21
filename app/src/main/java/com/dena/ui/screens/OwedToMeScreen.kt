@@ -1,5 +1,11 @@
 package com.dena.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,26 +65,40 @@ fun OwedToMeScreen(
             isOwedToMe = true,
         )
         val (openDebts, closedDebts) = debts.partition { !it.isClosed }
-        if (debts.isEmpty()) {
-            EmptyState(message = "No debts owed to you yet. Tap + to add one.")
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                SortMenuButton(sort = sort, onSortChange = { sort = it })
-            }
-            if (openDebts.isNotEmpty()) {
-                DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
-            }
-            if (closedDebts.isNotEmpty()) {
-                Text(
-                    text = "SETTLED",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
-                )
-                DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
+        AnimatedContent(
+            targetState = debts.isEmpty(),
+            transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
+            label = "OwedEmpty",
+        ) { isEmpty ->
+            if (isEmpty) {
+                EmptyState(message = "No debts owed to you yet. Tap + to add one.")
+            } else {
+                androidx.compose.foundation.layout.Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        SortMenuButton(sort = sort, onSortChange = { sort = it })
+                    }
+                    if (openDebts.isNotEmpty()) {
+                        DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
+                    }
+                    AnimatedVisibility(
+                        visible = closedDebts.isNotEmpty(),
+                        enter = fadeIn(tween(220)),
+                        exit = fadeOut(tween(180)),
+                    ) {
+                        androidx.compose.foundation.layout.Column {
+                            Text(
+                                text = "SETTLED",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+                            )
+                            DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
+                        }
+                    }
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ data class ThemeState(
     val paletteId: String,
     val paletteEnabled: Boolean,
     val dynamicScheme: String,
-    val fontSize: String,
-    val fontKey: String = "inter",
+    val fontScale: Float = 1f,
+    val displayScale: Float = 1f,
+    val fontKey: String = "spacegrotesk",
 )

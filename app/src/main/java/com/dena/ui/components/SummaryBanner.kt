@@ -1,5 +1,12 @@
 package com.dena.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -55,16 +62,24 @@ fun SummaryBanner(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
-            // Large total — match Debt Tracker font: ~42sp extra bold, tight line height
-            Text(
-                text = amountText,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = 44.sp,
-                letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            AnimatedContent(
+                targetState = amountText,
+                transitionSpec = {
+                    (slideInVertically(tween(220)) { it / 3 } + fadeIn(tween(180))) togetherWith
+                        (slideOutVertically(tween(220)) { -it / 3 } + fadeOut(tween(180)))
+                },
+                label = "MoneyTick",
+            ) { text ->
+                Text(
+                    text = text,
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 44.sp,
+                    letterSpacing = (-0.5).sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = countText,

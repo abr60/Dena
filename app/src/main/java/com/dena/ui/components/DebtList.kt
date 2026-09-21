@@ -1,5 +1,7 @@
 package com.dena.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -30,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -193,13 +194,14 @@ private fun DebtCardItem(
 ) {
     val isIOwe = debt.direction == "i_owe"
     val progress = if (debt.principalAmount > 0) ((debt.principalAmount - debt.remainingBalance) / debt.principalAmount * 100).toInt().coerceIn(0, 100) else 0
-    val isDark = isSystemInDarkTheme()
-    val cardContainer = when {
-        closed && isDark -> MaterialTheme.colorScheme.surfaceContainer
+    val targetContainer = when {
         closed -> MaterialTheme.colorScheme.surfaceContainer
-        isDark -> MaterialTheme.colorScheme.surfaceContainerHigh
+        isSystemInDarkTheme() -> MaterialTheme.colorScheme.surfaceContainerHigh
         else -> MaterialTheme.colorScheme.surfaceContainerLowest
     }
+    val cardContainer by animateColorAsState(targetValue = targetContainer, animationSpec = tween(250), label = "SettleCard")
+    val targetAvatar = if (closed) MaterialTheme.colorScheme.outline.copy(alpha = 0.35f) else MaterialTheme.colorScheme.primary
+    val avatarBg by animateColorAsState(targetValue = targetAvatar, animationSpec = tween(250), label = "SettleAvatar")
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -220,7 +222,6 @@ private fun DebtCardItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val letter = debt.contactName.firstOrNull()?.uppercase() ?: "?"
-            val avatarBg = if (closed) MaterialTheme.colorScheme.outline.copy(alpha = 0.35f) else MaterialTheme.colorScheme.primary
             val avatarFg = if (closed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
             Box(
                 modifier = Modifier

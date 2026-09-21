@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dena.R
 import com.dena.core.CurrencyRegistry
 import com.dena.core.DenaPreferences
@@ -70,6 +71,7 @@ fun DebtFormScreen(
     initialIsOwedToMe: Boolean? = null,
 ) {
     var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
     var isOwedToMe by remember { mutableStateOf(initialIsOwedToMe ?: true) }
     var notes by remember { mutableStateOf("") }
@@ -79,6 +81,14 @@ fun DebtFormScreen(
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
     var currencyCode by remember { mutableStateOf(prefs.getCurrency()) }
+    // existing contact names for suggestions
+    val owedList by viewModel.owedToMe.collectAsStateWithLifecycle()
+    val iOweList by viewModel.iOwe.collectAsStateWithLifecycle()
+    val allNames = remember(owedList, iOweList) { (owedList + iOweList).map { it.contactName }.distinct() }
+    val filteredSuggestions = remember(name, allNames) {
+        if (name.length < 1) emptyList()
+        else allNames.filter { it.contains(name.trim(), ignoreCase = true) && !it.equals(name.trim(), ignoreCase = true) }.take(5)
+    }
     var showCurrencyPicker by remember { mutableStateOf(false) }
     var datePickerTarget by remember { mutableStateOf<Pair<Long, (Long) -> Unit>?>(null) }
     val symbol = CurrencyRegistry.symbolFor(currencyCode)
@@ -170,7 +180,7 @@ fun DebtFormScreen(
                 .padding(top = 16.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Contact name — leading icon opens device contacts, field still allows manual typing
+            // Contact name — leading icon opens device contacts, field still allows manual typing + suggestions
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -190,6 +200,31 @@ fun DebtFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             )
+            if (filteredSuggestions.isNotEmpty()) {
+                androidx.compose.material3.Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp),
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        filteredSuggestions.forEach { suggestion ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable { name = suggestion }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Filled.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(suggestion, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+            }
 
             // Direction toggle — compact chip pair
             Row(
@@ -209,6 +244,18 @@ fun DebtFormScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+
+            // Phone (optional)
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it },
+                label = { Text("Phone (optional)") },
+                placeholder = { Text("017... or +880...") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            )
 
             // Amount + currency
             Row(
@@ -329,6 +376,7 @@ fun DebtFormScreen(
                     notes = notes.trim(),
                     dueDate = if (noDueDate) null else dueDate,
                     creationDate = creationDate,
+                    contactPhone = phone.trim().takeIf { it.isNotBlank() },
                 )
                 onBack()
             },

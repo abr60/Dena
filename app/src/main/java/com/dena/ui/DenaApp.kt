@@ -2,9 +2,18 @@ package com.dena.ui
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -126,7 +135,8 @@ fun DenaApp(database: DenaDatabase) {
                 paletteId = prefs.getPaletteId(),
                 paletteEnabled = prefs.isPaletteEnabled(),
                 dynamicScheme = prefs.getDynamicScheme(),
-                fontSize = prefs.getFontSize(),
+                fontScale = prefs.getFontScale(),
+                displayScale = prefs.getDisplayScale(),
                 fontKey = prefs.getAppFont(),
             )
         )
@@ -147,11 +157,11 @@ fun DenaApp(database: DenaDatabase) {
         initialPage = selectedTab.coerceAtMost(1),
         pageCount = { 2 },
     )
-    LaunchedEffect(pagerState.currentPage) {
-        if (selectedTab != 2) selectedTab = pagerState.currentPage
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress && selectedTab != 2) selectedTab = pagerState.currentPage
     }
     LaunchedEffect(selectedTab) {
-        if (selectedTab < 2) pagerState.animateScrollToPage(selectedTab)
+        if (selectedTab < 2 && pagerState.currentPage != selectedTab) pagerState.animateScrollToPage(selectedTab, animationSpec = tween(260))
     }
 
     // Auto-check for updates on app open (throttled 12h) — notification + in-app dialog
@@ -191,10 +201,20 @@ fun DenaApp(database: DenaDatabase) {
         }
     }
 
+    // — Route depth for horizontal screen motion (slide-from-right) —
+    // List = 0, Detail = 1, Form = 2, Settings = 3. Deeper = slide in from right; popping = slide to right.
+    val targetRoute = when {
+        showDebtForm -> 2
+        selectedDebtId != null -> 1
+        selectedTab == 2 -> 3
+        else -> 0
+    }
+
     com.dena.ui.theme.DenaTheme(
         themeMode = themeState.themeMode,
         palette = if (!themeState.dynamicColorsEnabled && themeState.paletteEnabled) PaletteRegistry.find(themeState.paletteId) else null,
-        fontSize = themeState.fontSize,
+        fontScale = themeState.fontScale,
+        displayScale = themeState.displayScale,
         dynamicScheme = themeState.dynamicScheme,
         followSystemTheme = themeState.followSystemTheme,
         dynamicColorsEnabled = themeState.dynamicColorsEnabled,
@@ -248,8 +268,8 @@ fun DenaApp(database: DenaDatabase) {
             floatingActionButton = {
                 AnimatedVisibility(
                     visible = showFab && selectedDebtId == null && !showDebtForm && showFabAnimated,
-                    enter = slideInVertically(initialOffsetY = { it * 2 }),
-                    exit = slideOutVertically(targetOffsetY = { it * 2 }),
+                    enter = scaleIn(animationSpec = tween(220)) + fadeIn(tween(180)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(260)),
+                    exit = scaleOut(animationSpec = tween(180)) + fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it / 2 }, animationSpec = tween(200)),
                 ) {
                     FloatingActionButton(
                         onClick = { showDebtForm = true },
@@ -271,112 +291,127 @@ fun DenaApp(database: DenaDatabase) {
                     .padding(innerPadding),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                if (showDebtForm) {
-                    DebtFormScreen(
-                        viewModel = viewModel, 
-                        onBack = { showDebtForm = false },
-                        initialIsOwedToMe = selectedTab == 1
+                // Update dialog sits above the animated content so it doesn't remount on route change
+                if (showUpdateDialog && pendingUpdate != null) {
+                    com.dena.ui.components.UpdateAvailableDialog(
+                        info = pendingUpdate!!,
+                        onDismiss = { showUpdateDialog = false },
+                        onDismissVersion = {
+                            prefs.setDismissedUpdateTag(pendingUpdate!!.tagName)
+                            showUpdateDialog = false
+                        },
                     )
-                } else if (selectedDebtId != null) {
-                    DebtDetailScreen(
-                        debtId = selectedDebtId!!,
-                        viewModel = viewModel,
-                        onBack = { selectedDebtId = null },
-                    )
-                } else {
-                    if (showUpdateDialog && pendingUpdate != null) {
-                        com.dena.ui.components.UpdateAvailableDialog(
-                            info = pendingUpdate!!,
-                            onDismiss = { showUpdateDialog = false },
-                            onDismissVersion = {
-                                prefs.setDismissedUpdateTag(pendingUpdate!!.tagName)
-                                showUpdateDialog = false
-                            },
-                        )
-                    }
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        if (selectedTab == 2) {
-                            SettingsScreen(
-                                themeMode = themeState.themeMode,
-                                onThemeChange = { newMode ->
-                                    themeState = themeState.copy(themeMode = newMode)
-                                    prefs.setThemeMode(newMode)
-                                },
-                                followSystemTheme = themeState.followSystemTheme,
-                                onFollowSystemThemeChange = { v ->
-                                    themeState = themeState.copy(
-                                        followSystemTheme = v,
-                                        themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
-                                    )
-                                    prefs.setFollowSystemTheme(v)
-                                    prefs.setThemeMode(themeState.themeMode)
-                                },
-                                manualDark = themeState.manualDark,
-                                onDarkModeChange = { v ->
-                                    themeState = themeState.copy(manualDark = v)
-                                    prefs.setDarkMode(v)
-                                },
-                                dynamicColorsEnabled = themeState.dynamicColorsEnabled,
-                                onDynamicColorsChange = { v ->
-                                    themeState = themeState.copy(
-                                        dynamicColorsEnabled = v,
-                                        paletteEnabled = if (v) false else themeState.paletteEnabled,
-                                        themeMode = if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM
-                                    )
-                                    prefs.setDynamicColorsEnabled(v)
-                                    prefs.setThemeMode(themeState.themeMode)
-                                    if (v) prefs.setPaletteEnabled(false)
-                                },
-                                paletteId = themeState.paletteId,
-                                onPaletteChange = { newId ->
-                                    themeState = themeState.copy(paletteId = newId)
-                                    prefs.setPaletteId(newId)
-                                },
-                                paletteEnabled = themeState.paletteEnabled,
-                                onPaletteEnabledChange = { enabled ->
-                                    themeState = themeState.copy(paletteEnabled = enabled)
-                                    prefs.setPaletteEnabled(enabled)
-                                },
-                                dynamicScheme = themeState.dynamicScheme,
-                                onDynamicSchemeChange = { newScheme ->
-                                    themeState = themeState.copy(dynamicScheme = newScheme)
-                                    prefs.setDynamicScheme(newScheme)
-                                },
-                                fontSize = themeState.fontSize,
-                                onFontSizeChange = { newSize ->
-                                    themeState = themeState.copy(fontSize = newSize)
-                                    prefs.setFontSize(newSize)
-                                },
-                                fontKey = themeState.fontKey,
-                                onFontKeyChange = { newKey ->
-                                    themeState = themeState.copy(fontKey = newKey)
-                                    prefs.setAppFont(newKey)
-                                },
-                                database = database,
-                            )
+                }
+                AnimatedContent(
+                    targetState = targetRoute,
+                    transitionSpec = {
+                        val isForward = targetState > initialState
+                        val slide = if (isForward) {
+                            slideInHorizontally(animationSpec = tween(260), initialOffsetX = { it / 3 }) + fadeIn(tween(220)) togetherWith
+                                slideOutHorizontally(animationSpec = tween(260), targetOffsetX = { -it / 3 }) + fadeOut(tween(220))
                         } else {
-                            HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier.fillMaxSize(),
-                                userScrollEnabled = true,
-                            ) { page ->
-                                when (page) {
-                                    0 -> IOweScreen(
-                                        viewModel = viewModel,
-                                        summaryTotal = summaryIOwe,
-                                        summaryCount = countIOwe,
-                                        onDebtClick = { debt -> selectedDebtId = debt.id },
-                                        listState = listStateIOwe,
-                                    )
-                                    1 -> OwedToMeScreen(
-                                        viewModel = viewModel,
-                                        summaryTotal = summaryOwedToMe,
-                                        summaryCount = countOwedToMe,
-                                        onDebtClick = { debt -> selectedDebtId = debt.id },
-                                        listState = listStateOwedToMe,
-                                    )
-                                    else -> Box(modifier = Modifier.fillMaxSize())
-                                }
+                            slideInHorizontally(animationSpec = tween(260), initialOffsetX = { -it / 3 }) + fadeIn(tween(220)) togetherWith
+                                slideOutHorizontally(animationSpec = tween(260), targetOffsetX = { it / 3 }) + fadeOut(tween(220))
+                        }
+                        slide
+                    },
+                    label = "DenaRoute",
+                ) { route ->
+                    when (route) {
+                        2 -> DebtFormScreen(
+                            viewModel = viewModel,
+                            onBack = { showDebtForm = false },
+                            initialIsOwedToMe = selectedTab == 1
+                        )
+                        1 -> DebtDetailScreen(
+                            debtId = selectedDebtId ?: -1L,
+                            viewModel = viewModel,
+                            onBack = { selectedDebtId = null },
+                        )
+                        3 -> SettingsScreen(
+                            themeMode = themeState.themeMode,
+                            onThemeChange = { newMode ->
+                                themeState = themeState.copy(themeMode = newMode)
+                                prefs.setThemeMode(newMode)
+                            },
+                            followSystemTheme = themeState.followSystemTheme,
+                            onFollowSystemThemeChange = { v ->
+                                themeState = themeState.copy(
+                                    followSystemTheme = v,
+                                    themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
+                                )
+                                prefs.setFollowSystemTheme(v)
+                                prefs.setThemeMode(themeState.themeMode)
+                            },
+                            manualDark = themeState.manualDark,
+                            onDarkModeChange = { v ->
+                                themeState = themeState.copy(manualDark = v)
+                                prefs.setDarkMode(v)
+                            },
+                            dynamicColorsEnabled = themeState.dynamicColorsEnabled,
+                            onDynamicColorsChange = { v ->
+                                themeState = themeState.copy(
+                                    dynamicColorsEnabled = v,
+                                    paletteEnabled = if (v) false else themeState.paletteEnabled,
+                                    themeMode = if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM
+                                )
+                                prefs.setDynamicColorsEnabled(v)
+                                prefs.setThemeMode(themeState.themeMode)
+                                if (v) prefs.setPaletteEnabled(false)
+                            },
+                            paletteId = themeState.paletteId,
+                            onPaletteChange = { newId ->
+                                themeState = themeState.copy(paletteId = newId)
+                                prefs.setPaletteId(newId)
+                            },
+                            paletteEnabled = themeState.paletteEnabled,
+                            onPaletteEnabledChange = { enabled ->
+                                themeState = themeState.copy(paletteEnabled = enabled)
+                                prefs.setPaletteEnabled(enabled)
+                            },
+                            dynamicScheme = themeState.dynamicScheme,
+                            onDynamicSchemeChange = { newScheme ->
+                                themeState = themeState.copy(dynamicScheme = newScheme)
+                                prefs.setDynamicScheme(newScheme)
+                            },
+                            fontScale = themeState.fontScale,
+                            onFontScaleChange = { v ->
+                                themeState = themeState.copy(fontScale = v)
+                                prefs.setFontScale(v)
+                            },
+                            displayScale = themeState.displayScale,
+                            onDisplayScaleChange = { v ->
+                                themeState = themeState.copy(displayScale = v)
+                                prefs.setDisplayScale(v)
+                            },
+                            fontKey = themeState.fontKey,
+                            onFontKeyChange = { newKey ->
+                                themeState = themeState.copy(fontKey = newKey)
+                                prefs.setAppFont(newKey)
+                            },
+                            database = database,
+                        )
+                        else -> HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            userScrollEnabled = true,
+                        ) { page ->
+                            when (page) {
+                                0 -> IOweScreen(
+                                    viewModel = viewModel,
+                                    summaryTotal = summaryIOwe,
+                                    summaryCount = countIOwe,
+                                    onDebtClick = { debt -> selectedDebtId = debt.id },
+                                    listState = listStateIOwe,
+                                )
+                                1 -> OwedToMeScreen(
+                                    viewModel = viewModel,
+                                    summaryTotal = summaryOwedToMe,
+                                    summaryCount = countOwedToMe,
+                                    onDebtClick = { debt -> selectedDebtId = debt.id },
+                                    listState = listStateOwedToMe,
+                                )
+                                else -> Box(modifier = Modifier.fillMaxSize())
                             }
                         }
                     }

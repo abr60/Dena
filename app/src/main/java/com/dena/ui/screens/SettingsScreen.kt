@@ -7,6 +7,13 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -40,7 +47,6 @@ import com.dena.ui.components.CurrencyPickerDialog
 import com.dena.ui.components.DenaSelect
 import com.dena.ui.components.LanguagePickerDialog
 import com.dena.ui.components.NavRow
-import com.dena.ui.components.ScalePickerSheet
 import com.dena.ui.components.SectionHeader
 import com.dena.ui.components.SelectOption
 import com.dena.ui.components.SettingsGroup
@@ -60,8 +66,10 @@ fun SettingsScreen(
     onPaletteChange: (String) -> Unit,
     onPaletteEnabledChange: (Boolean) -> Unit,
     paletteEnabled: Boolean,
-    fontSize: String = "medium",
-    onFontSizeChange: (String) -> Unit = {},
+    fontScale: Float = 1f,
+    onFontScaleChange: (Float) -> Unit = {},
+    displayScale: Float = 1f,
+    onDisplayScaleChange: (Float) -> Unit = {},
     dynamicScheme: String = "system",
     onDynamicSchemeChange: (String) -> Unit = {},
     // Talom clone — Follow System verbatim (added, default keeps backward compat)
@@ -72,7 +80,7 @@ fun SettingsScreen(
     // Pre-Android-10 manual switch (light by default)
     manualDark: Boolean = false,
     onDarkModeChange: (Boolean) -> Unit = {},
-    fontKey: String = "inter",
+    fontKey: String = "spacegrotesk",
     onFontKeyChange: (String) -> Unit = {},
     database: DenaDatabase? = null,
 ) {
@@ -88,13 +96,29 @@ fun SettingsScreen(
 
     BackHandler(enabled = subpage != null) { subpage = null }
 
-        when (subpage) {
-        "activity" -> { RecentActivitySubpage(database = database, onBack = { subpage = null }); return }
-        "appearance" -> { 
-            AppearanceSubpage(
+    AnimatedContent(
+        targetState = subpage,
+        transitionSpec = {
+            val isEnter = targetState != null && initialState == null
+            val isPop = targetState == null && initialState != null
+            when {
+                isEnter -> slideInHorizontally(tween(260), initialOffsetX = { it / 3 }) + fadeIn(tween(220)) togetherWith
+                    slideOutHorizontally(tween(260), targetOffsetX = { -it / 3 }) + fadeOut(tween(220))
+                isPop -> slideInHorizontally(tween(260), initialOffsetX = { -it / 3 }) + fadeIn(tween(220)) togetherWith
+                    slideOutHorizontally(tween(260), targetOffsetX = { it / 3 }) + fadeOut(tween(220))
+                else -> slideInHorizontally(tween(260), initialOffsetX = { it / 3 }) + fadeIn(tween(220)) togetherWith
+                    slideOutHorizontally(tween(260), targetOffsetX = { -it / 3 }) + fadeOut(tween(220))
+            }
+        },
+        label = "SettingsRoute",
+    ) { target ->
+        when (target) {
+            "activity" -> RecentActivitySubpage(database = database, onBack = { subpage = null })
+            "appearance" -> AppearanceSubpage(
                 themeMode, onThemeChange, paletteId, onPaletteChange,
                 onPaletteEnabledChange, paletteEnabled, isUnlocked,
-                fontSize, onFontSizeChange,
+                fontScale, onFontScaleChange,
+                displayScale, onDisplayScaleChange,
                 dynamicScheme, onDynamicSchemeChange,
                 followSystemTheme, onFollowSystemThemeChange,
                 dynamicColorsEnabled, onDynamicColorsChange,
@@ -102,56 +126,53 @@ fun SettingsScreen(
                 fontKey, onFontKeyChange,
                 onUnlock = { isUnlocked = true; prefs.setUnlocked(true) }
             ) { subpage = null }
-            return 
-        }
-        "userinterface" -> { UserPreferencesSubpage(database, onBack = { subpage = null }); return }
-        "update" -> { UpdateSubpage(onBack = { subpage = null }); return }
-        "about" -> { AboutSubpage(onBack = { subpage = null }); return }
-    }
+            "userinterface" -> UserPreferencesSubpage(database, onBack = { subpage = null })
+            "update" -> UpdateSubpage(onBack = { subpage = null })
+            "about" -> AboutSubpage(onBack = { subpage = null })
+            else -> Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val now = System.currentTimeMillis()
+                            if (now - lastTapMs > 700) tapCount = 1 else tapCount++
+                            lastTapMs = now
+                            if (tapCount >= 4) {
+                                tapCount = 0
+                                lastTapMs = 0L
+                                isUnlocked = !isUnlocked
+                                prefs.setUnlocked(isUnlocked)
+                                Toast.makeText(
+                                    context,
+                                    if (isUnlocked) "Advanced theme engine unlocked!" else "Advanced theme engine hidden",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                )
 
+                SettingsGroup {
+                    NavRow(label = "Appearance", icon = Icons.Filled.Palette, caption = "Theme, scale & colors", onClick = { subpage = "appearance" })
+                    NavRow(label = "Language & Formatting", icon = Icons.Filled.Language, caption = "Language, currency, numbers", onClick = { subpage = "userinterface" }, showDivider = true)
+                }
 
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    val now = System.currentTimeMillis()
-                    if (now - lastTapMs > 700) tapCount = 1 else tapCount++
-                    lastTapMs = now
-                    if (tapCount >= 4) {
-                        tapCount = 0
-                        lastTapMs = 0L
-                        isUnlocked = !isUnlocked
-                        prefs.setUnlocked(isUnlocked)
-                        Toast.makeText(
-                            context,
-                            if (isUnlocked) "Advanced theme engine unlocked!" else "Advanced theme engine hidden",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                },
-        )
+                SettingsGroup {
+                    NavRow(label = "Data", icon = Icons.Filled.Storage, caption = "Backup & restore", onClick = { showDataSheet = true }, showDivider = true)
+                    NavRow(label = "Recent Activity", icon = Icons.AutoMirrored.Filled.List, caption = "All transactions & retention", onClick = { subpage = "activity" }, showDivider = true)
+                }
 
-        SettingsGroup {
-            NavRow(label = "Appearance", icon = Icons.Filled.Palette, caption = "Theme, scale & colors", onClick = { subpage = "appearance" })
-            NavRow(label = "Language & Formatting", icon = Icons.Filled.Language, caption = "Language, currency, numbers", onClick = { subpage = "userinterface" }, showDivider = true)
-        }
-
-        SettingsGroup {
-            NavRow(label = "Data", icon = Icons.Filled.Storage, caption = "Backup & restore", onClick = { showDataSheet = true }, showDivider = true)
-            NavRow(label = "Recent Activity", icon = Icons.AutoMirrored.Filled.List, caption = "All transactions & retention", onClick = { subpage = "activity" }, showDivider = true)
-        }
-
-        SettingsGroup {
-            NavRow(label = "App Updates", icon = Icons.Filled.SystemUpdate, caption = "v${BuildConfig.VERSION_NAME} • Check for updates", onClick = { subpage = "update" }, showDivider = true)
-            NavRow(label = "Feedback", icon = Icons.Filled.Email, caption = "Report a bug or suggest a feature", onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/abr60/Dena/issues/new/choose"))) }, showDivider = true)
-            NavRow(label = "About", icon = Icons.Filled.Info, caption = "Our story, motto & version", onClick = { subpage = "about" })
+                SettingsGroup {
+                    NavRow(label = "App Updates", icon = Icons.Filled.SystemUpdate, caption = "v${BuildConfig.VERSION_NAME} • Check for updates", onClick = { subpage = "update" }, showDivider = true)
+                    NavRow(label = "Feedback", icon = Icons.Filled.Email, caption = "Report a bug or suggest a feature", onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/abr60/Dena/issues/new/choose"))) }, showDivider = true)
+                    NavRow(label = "About", icon = Icons.Filled.Info, caption = "Our story, motto & version", onClick = { subpage = "about" })
+                }
+            }
         }
     }
 
@@ -167,8 +188,10 @@ fun AppearanceSubpage(
     onPaletteEnabledChange: (Boolean) -> Unit,
     paletteEnabled: Boolean,
     isUnlocked: Boolean,
-    fontSize: String,
-    onFontSizeChange: (String) -> Unit,
+    fontScale: Float,
+    onFontScaleChange: (Float) -> Unit,
+    displayScale: Float,
+    onDisplayScaleChange: (Float) -> Unit,
     dynamicScheme: String,
     onDynamicSchemeChange: (String) -> Unit,
     // Talom clone — verbatim Follow System
@@ -178,7 +201,7 @@ fun AppearanceSubpage(
     onDynamicColorsChange: (Boolean) -> Unit = {},
     manualDark: Boolean = false,
     onDarkModeChange: (Boolean) -> Unit = {},
-    fontKey: String = "inter",
+    fontKey: String = "spacegrotesk",
     onFontKeyChange: (String) -> Unit = {},
     onUnlock: () -> Unit,
     onBack: () -> Unit
@@ -207,39 +230,68 @@ fun AppearanceSubpage(
             }
             
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                var showScaleSheet by remember { mutableStateOf(false) }
                 SectionHeader("SCALE")
                 SettingsGroup {
-                    Box(modifier = Modifier.fillMaxWidth().clickable { showScaleSheet = true }) {
-                        SettingsRow(
-                            label = "Scale",
-                            value = when (fontSize) { "small" -> "Small"; "large" -> "Large"; else -> "Medium" },
-                            showDivider = false,
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // Font size slider
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Font size", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Text("${(fontScale * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Slider(
+                                value = fontScale,
+                                onValueChange = onFontScaleChange,
+                                valueRange = 0.85f..1.30f,
+                                steps = 6,
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Small", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Large", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        // Display size slider
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Display size", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Text("${(displayScale * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Slider(
+                                value = displayScale,
+                                onValueChange = onDisplayScaleChange,
+                                valueRange = 0.85f..1.30f,
+                                steps = 6,
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Small", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Large", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        // Live preview
+                        Text(
+                            "Preview: The quick brown fox ৳1,200.50",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
                         )
                     }
-                }
-                if (showScaleSheet) {
-                    ScalePickerSheet(
-                        currentScale = fontSize,
-                        onPick = { picked -> onFontSizeChange(picked); showScaleSheet = false },
-                        onDismiss = { showScaleSheet = false },
-                    )
                 }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionHeader("FONT")
                 val fontOptions = listOf(
-                    SelectOption(label = "Inter", originalIndex = 0),
+                    SelectOption(label = "Space Grotesk", originalIndex = 0),
                     SelectOption(label = "JetBrains Mono", originalIndex = 1),
                     SelectOption(label = "System default", originalIndex = 2),
                 )
-                val currentFontLabel = when (fontKey) { "jbmono" -> "JetBrains Mono"; "system" -> "System default"; else -> "Inter" }
+                val currentFontLabel = when (fontKey) { "jbmono" -> "JetBrains Mono"; "system" -> "System default"; else -> "Space Grotesk" }
                 DenaSelect(
                     value = currentFontLabel,
                     options = fontOptions,
                     onSelect = { idx ->
-                        val key = when (idx) { 1 -> "jbmono"; 2 -> "system"; else -> "inter" }
+                        val key = when (idx) { 1 -> "jbmono"; 2 -> "system"; else -> "spacegrotesk" }
                         onFontKeyChange(key)
                     },
                     placeholder = "Select Font",

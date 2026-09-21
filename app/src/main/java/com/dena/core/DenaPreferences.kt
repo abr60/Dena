@@ -32,8 +32,16 @@ class DenaPreferences(context: Context) {
     }
     fun setThemeMode(mode: com.dena.ui.theme.DenaThemeMode) { prefs.edit().putString(KEY_THEME_MODE, mode.name).apply() }
 
-    fun getFontSize(): String = prefs.getString(KEY_FONT_SIZE, "medium") ?: "medium"
-    fun setFontSize(v: String) { prefs.edit().putString(KEY_FONT_SIZE, v).apply() }
+    fun getFontScale(): Float {
+        if (prefs.contains(KEY_FONT_SCALE)) return prefs.getFloat(KEY_FONT_SCALE, 1f)
+        // migrate legacy small/medium/large
+        val legacy = prefs.getString(KEY_FONT_SIZE, null)
+        return when (legacy) { "small" -> 0.85f; "large" -> 1.18f; else -> 1f }
+    }
+    fun setFontScale(v: Float) { prefs.edit().putFloat(KEY_FONT_SCALE, v).apply() }
+
+    fun getDisplayScale(): Float = prefs.getFloat(KEY_DISPLAY_SCALE, 1f)
+    fun setDisplayScale(v: Float) { prefs.edit().putFloat(KEY_DISPLAY_SCALE, v).apply() }
 
     fun getHistoryCleanDays(): Int = prefs.getInt(KEY_HISTORY_CLEAN_DAYS, 0)
     fun setHistoryCleanDays(v: Int) { prefs.edit().putInt(KEY_HISTORY_CLEAN_DAYS, v).apply() }
@@ -83,7 +91,11 @@ class DenaPreferences(context: Context) {
     fun showContactNumber(): Boolean = prefs.getBoolean(KEY_SHOW_CONTACT_NUMBER, false)
     fun setShowContactNumber(v: Boolean) { prefs.edit().putBoolean(KEY_SHOW_CONTACT_NUMBER, v).apply() }
 
-    fun getAppFont(): String = prefs.getString(KEY_APP_FONT, FONT_INTER) ?: FONT_INTER
+    fun getAppFont(): String {
+        val raw = prefs.getString(KEY_APP_FONT, FONT_SPACEGROTESK) ?: FONT_SPACEGROTESK
+        // migrate legacy "inter" -> spacegrotesk
+        return if (raw == FONT_INTER) FONT_SPACEGROTESK else raw
+    }
     fun setAppFont(v: String) { prefs.edit().putString(KEY_APP_FONT, v).apply() }
 
     companion object {
@@ -98,6 +110,8 @@ class DenaPreferences(context: Context) {
         const val KEY_PALETTE = "palette_id"
         const val KEY_PALETTE_ENABLED = "palette_enabled"
         const val KEY_FONT_SIZE = "font_size"
+        const val KEY_FONT_SCALE = "font_scale"
+        const val KEY_DISPLAY_SCALE = "display_scale"
         const val KEY_DYNAMIC_SCHEME = "dynamic_scheme"
         const val DYNAMIC_SYSTEM = "system"
         const val DYNAMIC_LIGHT = "light"
@@ -111,7 +125,8 @@ class DenaPreferences(context: Context) {
         const val KEY_SHOW_DATE_HEADERS = "show_date_headers"
         const val KEY_SHOW_CONTACT_NUMBER = "show_contact_number"
         const val KEY_APP_FONT = "app_font"
-        const val FONT_INTER = "inter"
+        const val FONT_INTER = "inter" // legacy, migrated to spacegrotesk
+        const val FONT_SPACEGROTESK = "spacegrotesk"
         const val FONT_JBMONO = "jbmono"
         const val FONT_SYSTEM = "system"
         const val LANG_EN = "en"

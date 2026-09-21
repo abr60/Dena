@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.10-alpha — 2026-09-21
+- **Space Grotesk default** — replaces Inter as the bundled UI font (`SpaceGrotesk-Variable.ttf`); Inter TTFs removed; legacy `inter` pref migrates to `spacegrotesk`. Font picker: Space Grotesk / JetBrains Mono / System. JetBrains Mono now loads all four weights.
+- **Font & display scale sliders** — continuous Font size + Display size (85–130%) replace Small/Medium/Large + `ScalePickerSheet`; legacy `font_size` migrates to `font_scale`.
+- **Motion** — horizontal slide between list ↔ detail ↔ form ↔ settings; Settings subpage enter/pop slides; FAB scale+fade; summary total tick animation; list empty-state crossfade; search header crossfade.
+- **Debt form** — contact-name suggestions from existing debts; optional phone field persisted as `contactPhone`.
+- **Debt detail** — edit contact phone; swap I Lent ↔ I Borrowed direction.
+
 ## v0.6.9-alpha — 2026-09-21
 - **Card shadows in all themes** — `DebtCardItem`, `SummaryBanner`, `DebtDetail` summary + `TransactionRow`, `Settings ActivityRow` now use constant `CardDefaults.cardElevation(2.dp)` (settled stays flat `0.dp`). Removed `if (isDark) 0.dp else 2.dp` conditionals so shadow renders in light, dark, follow-system, and opposite modes on all API levels (minSdk 24).
 

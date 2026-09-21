@@ -140,36 +140,37 @@ fun buildFontFamily(fontKey: String, assets: AssetManager): FontFamily {
     return when (fontKey) {
         "jbmono" -> try {
             FontFamily(
-                Font("fonts/JetBrainsMono-Regular.ttf", assets),
+                Font("fonts/JetBrainsMono-Regular.ttf", assets, FontWeight.Normal),
+                Font("fonts/JetBrainsMono-Medium.ttf", assets, FontWeight.Medium),
+                Font("fonts/JetBrainsMono-SemiBold.ttf", assets, FontWeight.SemiBold),
+                Font("fonts/JetBrainsMono-Bold.ttf", assets, FontWeight.Bold),
             )
         } catch (_: Exception) { FontFamily.Monospace }
         "system" -> FontFamily.Default
-        else -> try { // "inter" default
+        else -> try { // "spacegrotesk" default (also migrates legacy "inter")
             FontFamily(
-                Font("fonts/Inter-Regular.ttf", assets),
+                Font("fonts/SpaceGrotesk-Variable.ttf", assets, FontWeight.Normal),
+                Font("fonts/SpaceGrotesk-Variable.ttf", assets, FontWeight.Medium),
+                Font("fonts/SpaceGrotesk-Variable.ttf", assets, FontWeight.SemiBold),
+                Font("fonts/SpaceGrotesk-Variable.ttf", assets, FontWeight.Bold),
             )
         } catch (_: Exception) { FontFamily.Default }
     }
-}
-
-fun fontScaleFor(size: String): Float = when (size.lowercase()) {
-    "small" -> 0.85f
-    "large" -> 1.18f
-    else -> 1f
 }
 
 @Composable
 fun DenaTheme(
     themeMode: DenaThemeMode = DenaThemeMode.SYSTEM,
     palette: ThemePalette? = null,
-    fontSize: String = "medium",
+    fontScale: Float = 1f,
+    displayScale: Float = 1f,
     dynamicScheme: String = "system",
     // Talom clone — perfect word-for-word Follow System logic
     followSystemTheme: Boolean? = null,
     dynamicColorsEnabled: Boolean? = null,
     // Manual dark switch for pre-Android-10 (API < 29): no system dark mode exists there
     manualDark: Boolean? = null,
-    fontKey: String = "inter",
+    fontKey: String = "spacegrotesk",
     content: @Composable () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -209,8 +210,7 @@ fun DenaTheme(
     }
 
     val baseDensity = LocalDensity.current
-    val scale = fontScaleFor(fontSize)
-    val scaledDensity = Density(baseDensity.density, baseDensity.fontScale * scale)
+    val scaledDensity = Density(baseDensity.density * displayScale, baseDensity.fontScale * fontScale)
 
     val moneyPalette = remember(palette) {
         if (palette != null) {
