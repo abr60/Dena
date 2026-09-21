@@ -174,7 +174,7 @@ fun DebtDetailScreen(
                 ),
                 shape = RoundedCornerShape(14.dp),
                 elevation = androidx.compose.material3.CardDefaults.cardElevation(
-                    defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+                    defaultElevation = 2.dp,
                 ),
             ) {
                 Column(
@@ -405,7 +405,7 @@ private fun TransactionRow(
         ),
         shape = RoundedCornerShape(12.dp),
         elevation = androidx.compose.material3.CardDefaults.cardElevation(
-            defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+            defaultElevation = 2.dp,
         ),
     ) {
         Row(

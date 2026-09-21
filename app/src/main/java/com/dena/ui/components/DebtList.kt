@@ -210,7 +210,7 @@ private fun DebtCardItem(
         ),
         shape = RoundedCornerShape(14.dp),
         elevation = androidx.compose.material3.CardDefaults.cardElevation(
-            defaultElevation = if (closed) 0.dp else if (isDark) 0.dp else 2.dp,
+            defaultElevation = if (closed) 0.dp else 2.dp,
         ),
     ) {
         Row(

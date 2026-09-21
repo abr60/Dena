@@ -47,7 +47,7 @@ fun SummaryBanner(
         ),
         shape = RoundedCornerShape(14.dp),
         elevation = androidx.compose.material3.CardDefaults.cardElevation(
-            defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+            defaultElevation = 2.dp,
         ),
     ) {
         Column(

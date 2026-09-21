@@ -644,7 +644,7 @@ private fun ActivityRow(
         ),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+            defaultElevation = 2.dp,
         ),
     ) {
         Row(
