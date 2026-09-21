@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -71,6 +72,8 @@ fun SettingsScreen(
     // Pre-Android-10 manual switch (light by default)
     manualDark: Boolean = false,
     onDarkModeChange: (Boolean) -> Unit = {},
+    fontKey: String = "inter",
+    onFontKeyChange: (String) -> Unit = {},
     database: DenaDatabase? = null,
 ) {
     val context = LocalContext.current
@@ -96,6 +99,7 @@ fun SettingsScreen(
                 followSystemTheme, onFollowSystemThemeChange,
                 dynamicColorsEnabled, onDynamicColorsChange,
                 manualDark, onDarkModeChange,
+                fontKey, onFontKeyChange,
                 onUnlock = { isUnlocked = true; prefs.setUnlocked(true) }
             ) { subpage = null }
             return 
@@ -174,6 +178,8 @@ fun AppearanceSubpage(
     onDynamicColorsChange: (Boolean) -> Unit = {},
     manualDark: Boolean = false,
     onDarkModeChange: (Boolean) -> Unit = {},
+    fontKey: String = "inter",
+    onFontKeyChange: (String) -> Unit = {},
     onUnlock: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -219,6 +225,25 @@ fun AppearanceSubpage(
                         onDismiss = { showScaleSheet = false },
                     )
                 }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeader("FONT")
+                val fontOptions = listOf(
+                    SelectOption(label = "Inter", originalIndex = 0),
+                    SelectOption(label = "JetBrains Mono", originalIndex = 1),
+                    SelectOption(label = "System default", originalIndex = 2),
+                )
+                val currentFontLabel = when (fontKey) { "jbmono" -> "JetBrains Mono"; "system" -> "System default"; else -> "Inter" }
+                DenaSelect(
+                    value = currentFontLabel,
+                    options = fontOptions,
+                    onSelect = { idx ->
+                        val key = when (idx) { 1 -> "jbmono"; 2 -> "system"; else -> "inter" }
+                        onFontKeyChange(key)
+                    },
+                    placeholder = "Select Font",
+                )
             }
 
             // Talom clone — verbatim Advanced > Dynamic colors (word-for-word strings & logic)
@@ -299,6 +324,8 @@ fun UserPreferencesSubpage(database: DenaDatabase?, onBack: () -> Unit) {
         var showCurrencyPicker by remember { mutableStateOf(false) }
         var showLanguagePicker by remember { mutableStateOf(false) }
         var showPercentage by remember { mutableStateOf(prefs.showPercentage()) }
+        var showContactNumber by remember { mutableStateOf(prefs.showContactNumber()) }
+        var showDateHeaders by remember { mutableStateOf(prefs.showDateHeaders()) }
 
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             SectionHeader("LOCALIZATION")
@@ -317,7 +344,14 @@ fun UserPreferencesSubpage(database: DenaDatabase?, onBack: () -> Unit) {
                         showDivider = true
                     )
                 }
-                ToggleRow(label = "Show decimals", caption = "e.g. ${prefs.getCurrencySymbol()} 1,200.00 vs ${prefs.getCurrencySymbol()} 1,200", checked = showDecimals, onCheckedChange = { showDecimals = it; prefs.setShowDecimals(it) }, showDivider = false)
+                ToggleRow(label = "Show decimals", caption = "e.g. ${prefs.getCurrencySymbol()} 1,200.00 vs ${prefs.getCurrencySymbol()} 1,200", checked = showDecimals, onCheckedChange = { showDecimals = it; prefs.setShowDecimals(it) }, showDivider = true)
+                ToggleRow(
+                    label = "Show contact number",
+                    caption = "Display phone number on debt cards",
+                    checked = showContactNumber,
+                    onCheckedChange = { showContactNumber = it; prefs.setShowContactNumber(it) },
+                    showDivider = false,
+                )
             }
             if (showLanguagePicker) {
                 LanguagePickerDialog(currentLanguage = language, onPick = { picked -> language = picked; prefs.setLanguage(picked); showLanguagePicker = false }, onDismiss = { showLanguagePicker = false })
@@ -333,6 +367,13 @@ fun UserPreferencesSubpage(database: DenaDatabase?, onBack: () -> Unit) {
                     caption = "Show paid % on debtor cards",
                     checked = showPercentage,
                     onCheckedChange = { showPercentage = it; prefs.setShowPercentage(it) },
+                    showDivider = true
+                )
+                ToggleRow(
+                    label = "By date",
+                    caption = "Group debts by date with headers",
+                    checked = showDateHeaders,
+                    onCheckedChange = { showDateHeaders = it; prefs.setShowDateHeaders(it) },
                     showDivider = false
                 )
             }
@@ -595,13 +636,16 @@ private fun ActivityRow(
     currencySymbol: String,
     showDecimals: Boolean,
 ) {
+    val activityCardContainer = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = activityCardContainer,
         ),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+        ),
     ) {
         Row(
             modifier = Modifier

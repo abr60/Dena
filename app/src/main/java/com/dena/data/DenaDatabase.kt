@@ -19,9 +19,15 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE debts ADD COLUMN contactPhone TEXT")
+    }
+}
+
 @Database(
     entities = [Debt::class, Transaction::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class DenaDatabase : RoomDatabase() {

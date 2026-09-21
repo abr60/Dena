@@ -16,6 +16,7 @@ data class Debt(
     val dueDate: Long?, // Null = indefinite debt
     val category: String, // e.g., "Rent", "Groceries"
     val notes: String,
+    val contactPhone: String? = null,
     val creationDate: Long = System.currentTimeMillis(), // Manually set date
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
@@ -32,6 +33,7 @@ data class Debt(
             dueDate: Long? = null,
             category: String = "Other",
             notes: String = "",
+            contactPhone: String? = null,
             creationDate: Long = System.currentTimeMillis(),
         ): Debt = Debt(
             principalAmount = principalAmount,
@@ -44,6 +46,7 @@ data class Debt(
             dueDate = dueDate,
             category = category,
             notes = notes,
+            contactPhone = contactPhone,
             creationDate = creationDate,
         )
     }

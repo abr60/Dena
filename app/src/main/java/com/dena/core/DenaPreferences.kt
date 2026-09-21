@@ -19,7 +19,7 @@ class DenaPreferences(context: Context) {
     fun setCurrency(value: String) { prefs.edit().putString(KEY_CURRENCY, value.uppercase(java.util.Locale.US)).apply() }
     fun getCurrencySymbol(): String = CurrencyRegistry.symbolFor(getCurrency())
 
-    fun showDecimals(): Boolean = prefs.getBoolean(KEY_SHOW_DECIMALS, true)
+    fun showDecimals(): Boolean = prefs.getBoolean(KEY_SHOW_DECIMALS, false)
     fun setShowDecimals(v: Boolean) { prefs.edit().putBoolean(KEY_SHOW_DECIMALS, v).apply() }
 
     fun showPercentage(): Boolean = prefs.getBoolean(KEY_SHOW_PERCENTAGE, false)
@@ -77,6 +77,15 @@ class DenaPreferences(context: Context) {
     fun getLastNotifiedTag(): String = prefs.getString(KEY_LAST_NOTIFIED_TAG, "") ?: ""
     fun setLastNotifiedTag(v: String) { prefs.edit().putString(KEY_LAST_NOTIFIED_TAG, v).apply() }
 
+    fun showDateHeaders(): Boolean = prefs.getBoolean(KEY_SHOW_DATE_HEADERS, false)
+    fun setShowDateHeaders(v: Boolean) { prefs.edit().putBoolean(KEY_SHOW_DATE_HEADERS, v).apply() }
+
+    fun showContactNumber(): Boolean = prefs.getBoolean(KEY_SHOW_CONTACT_NUMBER, false)
+    fun setShowContactNumber(v: Boolean) { prefs.edit().putBoolean(KEY_SHOW_CONTACT_NUMBER, v).apply() }
+
+    fun getAppFont(): String = prefs.getString(KEY_APP_FONT, FONT_INTER) ?: FONT_INTER
+    fun setAppFont(v: String) { prefs.edit().putString(KEY_APP_FONT, v).apply() }
+
     companion object {
         const val PREFS_NAME = "dena_preferences"
         const val KEY_THEME_MODE = "theme_mode"
@@ -99,6 +108,12 @@ class DenaPreferences(context: Context) {
         const val KEY_DISMISSED_UPDATE_TAG = "dismissed_update_tag"
         const val KEY_LAST_UPDATE_CHECK = "last_update_check"
         const val KEY_LAST_NOTIFIED_TAG = "last_notified_tag"
+        const val KEY_SHOW_DATE_HEADERS = "show_date_headers"
+        const val KEY_SHOW_CONTACT_NUMBER = "show_contact_number"
+        const val KEY_APP_FONT = "app_font"
+        const val FONT_INTER = "inter"
+        const val FONT_JBMONO = "jbmono"
+        const val FONT_SYSTEM = "system"
         const val LANG_EN = "en"
         const val LANG_BN = "bn"
         const val CURRENCY_BDT = "BDT"

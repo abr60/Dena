@@ -11,4 +11,5 @@ data class ThemeState(
     val paletteEnabled: Boolean,
     val dynamicScheme: String,
     val fontSize: String,
+    val fontKey: String = "inter",
 )

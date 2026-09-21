@@ -1,5 +1,6 @@
 package com.dena.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,15 +37,18 @@ fun SummaryBanner(
         else -> "$count open debts"
     }
 
+    val cardContainer = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp),
         colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = cardContainer,
         ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(14.dp),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(
+            defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+        ),
     ) {
         Column(
             modifier = Modifier

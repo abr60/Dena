@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.8-alpha — 2026-09-21
+- **Reference-style cards** — match Device Info Sensors reference (white `#FFFFFF` cards on warm gray, 14dp big / 12dp rows, 2dp light elevation / 0dp dark, no stroke). `DebtCardItem`, `SummaryBanner`, `DebtDetail` summary + `TransactionRow`, `Settings ActivityRow` use elevated neutral `surfaceContainerLowest` (light) / `surfaceContainerHigh` (dark); settled uses flat `surfaceContainer` 0dp with muted `outline` avatar. Fixed settled ghosting (removed `alpha(0.55)`, flat muted container + outline avatar, bottom padding 24dp). Avatar follows `primary` (dynamic accent when Material You active). Dynamic colors overlay only accents — card design applies to all themes, not limited to Material You.
+- **Preferences** — `showDecimals` default `false`; `Show decimals` toggle in Localization; `Show contact number` (DB v3 `contactPhone` migration) toggle + display on debt cards (`MIGRATION_2_3`); `Show percentages` + moved `By date` (`showDateHeaders`, default off) toggle from list screens to `Settings → Language & Formatting → Formatting` (screens now read `prefs.showDateHeaders()`); date headers gated by pref.
+- **Font picker** — `Settings → Appearance → FONT` changed from 3 `SettingsRow`+check rows to `DenaSelect` dropdown (Inter / JetBrains Mono / System default, keys `inter`/`jbmono`/`system` → `DenaPreferences.KEY_APP_FONT`, wired via `ThemeState.fontKey` + `DenaTheme` `fontKey` → `buildFontFamily`).
+- **Due date cleanup** — removed “loan with no due date” / “No due date” fallback; `DebtList` + `DebtDetail` only show due line when `dueDate != null` (form picker kept).
+- **Theming** — `DenaLightScheme`/`DenaDarkScheme` neutral `surfaceContainer*` ramps; `buildDynamicScheme` overlays only accents (`primary`/`secondary`/`tertiary`/`surfaceTint`) from wallpaper when `dynamicColorsEnabled && S+`, keeps surfaces neutral.
+
 ## v0.6.7-alpha — 2026-09-18
 - **Tab icons swap** — `I Borrowed` now uses the list icon, `I Lent` uses the person icon (positions unchanged).
 

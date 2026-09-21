@@ -13,11 +13,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
+import android.content.res.AssetManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 import com.dena.core.ThemePalette
@@ -131,6 +136,22 @@ fun buildDynamicScheme(ctx: Context, dark: Boolean): androidx.compose.material3.
     )
 }
 
+fun buildFontFamily(fontKey: String, assets: AssetManager): FontFamily {
+    return when (fontKey) {
+        "jbmono" -> try {
+            FontFamily(
+                Font("fonts/JetBrainsMono-Regular.ttf", assets),
+            )
+        } catch (_: Exception) { FontFamily.Monospace }
+        "system" -> FontFamily.Default
+        else -> try { // "inter" default
+            FontFamily(
+                Font("fonts/Inter-Regular.ttf", assets),
+            )
+        } catch (_: Exception) { FontFamily.Default }
+    }
+}
+
 fun fontScaleFor(size: String): Float = when (size.lowercase()) {
     "small" -> 0.85f
     "large" -> 1.18f
@@ -148,6 +169,7 @@ fun DenaTheme(
     dynamicColorsEnabled: Boolean? = null,
     // Manual dark switch for pre-Android-10 (API < 29): no system dark mode exists there
     manualDark: Boolean? = null,
+    fontKey: String = "inter",
     content: @Composable () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -204,10 +226,31 @@ fun DenaTheme(
         }
     }
 
+    val fontFamily = remember(fontKey) { buildFontFamily(fontKey, ctx.assets) }
+    val typography = MaterialTheme.typography.run {
+        copy(
+            displayLarge = displayLarge.copy(fontFamily = fontFamily),
+            displayMedium = displayMedium.copy(fontFamily = fontFamily),
+            displaySmall = displaySmall.copy(fontFamily = fontFamily),
+            headlineLarge = headlineLarge.copy(fontFamily = fontFamily),
+            headlineMedium = headlineMedium.copy(fontFamily = fontFamily),
+            headlineSmall = headlineSmall.copy(fontFamily = fontFamily),
+            titleLarge = titleLarge.copy(fontFamily = fontFamily),
+            titleMedium = titleMedium.copy(fontFamily = fontFamily),
+            titleSmall = titleSmall.copy(fontFamily = fontFamily),
+            bodyLarge = bodyLarge.copy(fontFamily = fontFamily),
+            bodyMedium = bodyMedium.copy(fontFamily = fontFamily),
+            bodySmall = bodySmall.copy(fontFamily = fontFamily),
+            labelLarge = labelLarge.copy(fontFamily = fontFamily),
+            labelMedium = labelMedium.copy(fontFamily = fontFamily),
+            labelSmall = labelSmall.copy(fontFamily = fontFamily),
+        )
+    }
+
     CompositionLocalProvider(
         LocalDensity provides scaledDensity,
         LocalMoneyPalette provides moneyPalette,
     ) {
-        MaterialTheme(colorScheme = colorScheme, content = content)
+        MaterialTheme(colorScheme = colorScheme, typography = typography, content = content)
     }
 }

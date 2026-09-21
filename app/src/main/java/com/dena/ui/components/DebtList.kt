@@ -1,5 +1,6 @@
 package com.dena.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -92,7 +95,6 @@ fun SortMenuButton(
                     leadingIcon = if (option == sort) {
                         { Icon(Icons.Filled.Check, contentDescription = null) }
                     } else null,
-                    // Placeholder for future category filtering — visible but not selectable yet
                     enabled = option != DebtSort.CATEGORY,
                     onClick = {
                         onSortChange(option)
@@ -109,18 +111,20 @@ fun DebtList(
     debts: List<Debt>,
     onDebtClick: (Debt) -> Unit,
     searchQuery: String = "",
-    closed: Boolean = false, // settled rows: greyed out, tappable to view/edit
+    closed: Boolean = false,
     modifier: Modifier = Modifier,
     sort: DebtSort = DebtSort.NEWEST,
+    showDateHeaders: Boolean = false,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
     val currencySymbol = prefs.getCurrencySymbol()
     val showPercentage = prefs.showPercentage()
     val showDecimals = prefs.showDecimals()
+    val showContactNumber = prefs.showContactNumber()
     val dateFmt = SimpleDateFormat("M/d/yy", Locale.US)
 
-    // Filter by search
     val filtered = remember(debts, searchQuery) {
         if (searchQuery.isBlank()) debts
         else debts.filter { it.contactName.contains(searchQuery, ignoreCase = true) }
@@ -134,7 +138,6 @@ fun DebtList(
         )
         return
     }
-    // Sort first, then group by day (group order follows first appearance)
     val sorted = remember(filtered, sort) {
         when (sort) {
             DebtSort.NEWEST, DebtSort.CATEGORY -> filtered.sortedByDescending { it.dateOpened }
@@ -142,24 +145,25 @@ fun DebtList(
             DebtSort.AMOUNT_DESC -> filtered.sortedByDescending { it.remainingBalance }
         }
     }
-    // Group by day — like Debt Tracker TODAY
     val grouped = remember(sorted) {
         sorted.groupBy { sectionHeader(it.dateOpened) }
     }
 
     Column(
-        modifier = modifier.fillMaxWidth().padding(bottom = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 24.dp),
     ) {
         grouped.forEach { (header, groupDebts) ->
-            Text(
-                text = header,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(top = 14.dp, bottom = 6.dp),
-            )
+            if (showDateHeaders) {
+                Text(
+                    text = header,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(top = 14.dp, bottom = 6.dp),
+                )
+            }
             groupDebts.forEach { debt ->
                 DebtCardItem(
                     debt = debt,
@@ -168,6 +172,7 @@ fun DebtList(
                     currencySymbol = currencySymbol,
                     showPercentage = showPercentage,
                     showDecimals = showDecimals,
+                    showContactNumber = showContactNumber,
                     dateFmt = dateFmt,
                 )
             }
@@ -183,21 +188,30 @@ private fun DebtCardItem(
     currencySymbol: String,
     showPercentage: Boolean,
     showDecimals: Boolean,
+    showContactNumber: Boolean,
     dateFmt: SimpleDateFormat,
 ) {
     val isIOwe = debt.direction == "i_owe"
     val progress = if (debt.principalAmount > 0) ((debt.principalAmount - debt.remainingBalance) / debt.principalAmount * 100).toInt().coerceIn(0, 100) else 0
+    val isDark = isSystemInDarkTheme()
+    val cardContainer = when {
+        closed && isDark -> MaterialTheme.colorScheme.surfaceContainer
+        closed -> MaterialTheme.colorScheme.surfaceContainer
+        isDark -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> MaterialTheme.colorScheme.surfaceContainerLowest
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp)
-            .alpha(if (closed) 0.55f else 1f),
+            .padding(vertical = 5.dp),
         onClick = { onDebtClick(debt) },
         colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = cardContainer,
         ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(14.dp),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(
+            defaultElevation = if (closed) 0.dp else if (isDark) 0.dp else 2.dp,
+        ),
     ) {
         Row(
             modifier = Modifier
@@ -206,13 +220,15 @@ private fun DebtCardItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val letter = debt.contactName.firstOrNull()?.uppercase() ?: "?"
+            val avatarBg = if (closed) MaterialTheme.colorScheme.outline.copy(alpha = 0.35f) else MaterialTheme.colorScheme.primary
+            val avatarFg = if (closed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    .background(avatarBg, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(letter.toString(), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary)
+                Text(letter.toString(), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = avatarFg)
             }
             Column(
                 modifier = Modifier.weight(1f).padding(start = 12.dp, end = 10.dp),
@@ -223,12 +239,22 @@ private fun DebtCardItem(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                 )
-                Text(
-                    text = if (debt.dueDate != null) "due ${dateFmt.format(debt.dueDate)}" else "loan with no due date",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+                if (showContactNumber && !debt.contactPhone.isNullOrBlank()) {
+                    Text(
+                        text = debt.contactPhone,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                if (debt.dueDate != null) {
+                    Text(
+                        text = "due ${dateFmt.format(debt.dueDate)}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
             Column(
                 modifier = Modifier.width(112.dp),
@@ -242,7 +268,6 @@ private fun DebtCardItem(
                         maxLines = 1,
                     )
                 }
-                // Use per-debt currency symbol if set, else passed symbol
                 val sym = if (debt.currency.isNotBlank()) CurrencyRegistry.symbolFor(debt.currency) else currencySymbol
                 Text(
                     text = formatCurrencyRaw(debt.principalAmount, sym, showDecimals),
@@ -251,7 +276,6 @@ private fun DebtCardItem(
                     maxLines = 1,
                 )
                 if (closed) {
-                    // Settled: amount replaced by a quiet status label
                     Text(
                         text = "Paid off",
                         fontSize = 15.sp,
@@ -260,7 +284,6 @@ private fun DebtCardItem(
                         maxLines = 1,
                     )
                 } else {
-                    // Signed amount — I Owe = -$X, Owed to Me = +$X
                     val raw = formatSigned(debt.remainingBalance, sym, negative = isIOwe, showDecimals = showDecimals)
                     val balText = if (isIOwe) raw else "+ $raw"
                     val moneyPalette = com.dena.ui.theme.LocalMoneyPalette.current

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ fun OwedToMeScreen(
     summaryTotal: Double,
     summaryCount: Int,
     onDebtClick: (Debt) -> Unit,
+    listState: LazyListState,
 ) {
     val debts by viewModel.owedToMe.collectAsStateWithLifecycle()
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -41,6 +43,7 @@ fun OwedToMeScreen(
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
     val symbol = prefs.getCurrencySymbol()
+    val showDateHeaders = prefs.showDateHeaders()
 
     ScreenContainer(
         title = "Owed to Me",
@@ -66,7 +69,7 @@ fun OwedToMeScreen(
                 SortMenuButton(sort = sort, onSortChange = { sort = it })
             }
             if (openDebts.isNotEmpty()) {
-                DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort)
+                DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
             }
             if (closedDebts.isNotEmpty()) {
                 Text(
@@ -75,7 +78,7 @@ fun OwedToMeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
                 )
-                DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort)
+                DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.dena.ui.screens
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.dena.ui.components.DenaDatePickerDialog
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -164,14 +165,17 @@ fun DebtDetailScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // B. Summary card — monochrome shell, only history keeps red/green
+            // B. Summary card — reference-style elevated neutral
+            val detailCardContainer = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = androidx.compose.material3.CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    containerColor = detailCardContainer,
                 ),
-                shape = RoundedCornerShape(16.dp),
-                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 0.dp),
+                shape = RoundedCornerShape(14.dp),
+                elevation = androidx.compose.material3.CardDefaults.cardElevation(
+                    defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+                ),
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -205,11 +209,13 @@ fun DebtDetailScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        text = if (debt.dueDate != null) "Due: ${formatRelativeDate(debt.dueDate!!)}" else stringResource(R.string.no_due_date),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (debt.dueDate != null) {
+                        Text(
+                            text = "Due: ${formatRelativeDate(debt.dueDate!!)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (debt.notes.isNotBlank()) {
                         Text(
                             text = debt.notes,
@@ -329,6 +335,27 @@ fun DebtDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                 ) { Text("Export as CSV") }
+                if (isOwedToMe) {
+                    OutlinedButton(
+                        onClick = {
+                            val phone = debt.contactPhone?.takeIf { it.isNotBlank() } ?: ""
+                            val remaining = formatCurrencyRaw(debt.remainingBalance, sym, showDecimals)
+                            val message = "Hi ${debt.contactName}, just a reminder that you owe me $remaining. Please settle when convenient. - sent via Dena"
+                            val uri = if (phone.isNotBlank()) {
+                                android.net.Uri.parse("smsto:$phone")
+                            } else {
+                                android.net.Uri.parse("smsto:")
+                            }
+                            val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO, uri).apply {
+                                putExtra("sms_body", message)
+                            }
+                            try { ctx.startActivity(intent) } catch (_: Exception) {}
+                            showExportSheet = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) { Text("Send Message to ${debt.contactName}") }
+                }
             }
         }
     }
@@ -370,13 +397,16 @@ private fun TransactionRow(
     }
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
+    val txCardContainer = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = txCardContainer,
         ),
         shape = RoundedCornerShape(12.dp),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(
+            defaultElevation = if (isSystemInDarkTheme()) 0.dp else 2.dp,
+        ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),

@@ -13,6 +13,6 @@ object DenaDatabaseProvider {
                 context.applicationContext,
                 DenaDatabase::class.java,
                 "dena.db",
-            ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
         }
 }

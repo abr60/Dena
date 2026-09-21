@@ -2,6 +2,9 @@ package com.dena.ui
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -39,6 +47,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -118,8 +127,31 @@ fun DenaApp(database: DenaDatabase) {
                 paletteEnabled = prefs.isPaletteEnabled(),
                 dynamicScheme = prefs.getDynamicScheme(),
                 fontSize = prefs.getFontSize(),
+                fontKey = prefs.getAppFont(),
             )
         )
+    }
+
+    val listStateOwedToMe = rememberLazyListState()
+    val listStateIOwe = rememberLazyListState()
+    val activeListState = if (selectedTab == 1) listStateOwedToMe else listStateIOwe
+    val showFabAnimated by remember {
+        derivedStateOf {
+            val layoutInfo = activeListState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) return@derivedStateOf true
+            activeListState.firstVisibleItemIndex == 0 || activeListState.firstVisibleItemScrollOffset == 0
+        }
+    }
+    val pagerState = rememberPagerState(
+        initialPage = selectedTab.coerceAtMost(1),
+        pageCount = { 2 },
+    )
+    LaunchedEffect(pagerState.currentPage) {
+        if (selectedTab != 2) selectedTab = pagerState.currentPage
+    }
+    LaunchedEffect(selectedTab) {
+        if (selectedTab < 2) pagerState.animateScrollToPage(selectedTab)
     }
 
     // Auto-check for updates on app open (throttled 12h) — notification + in-app dialog
@@ -166,7 +198,8 @@ fun DenaApp(database: DenaDatabase) {
         dynamicScheme = themeState.dynamicScheme,
         followSystemTheme = themeState.followSystemTheme,
         dynamicColorsEnabled = themeState.dynamicColorsEnabled,
-        manualDark = themeState.manualDark
+        manualDark = themeState.manualDark,
+        fontKey = themeState.fontKey,
     ) {
         Scaffold(
             bottomBar = {
@@ -213,13 +246,21 @@ fun DenaApp(database: DenaDatabase) {
                 }
             },
             floatingActionButton = {
-                if (showFab && selectedDebtId == null && !showDebtForm) {
+                AnimatedVisibility(
+                    visible = showFab && selectedDebtId == null && !showDebtForm && showFabAnimated,
+                    enter = slideInVertically(initialOffsetY = { it * 2 }),
+                    exit = slideOutVertically(targetOffsetY = { it * 2 }),
+                ) {
                     FloatingActionButton(
                         onClick = { showDebtForm = true },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add debt")
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = "Add debt",
+                            modifier = Modifier.size(28.dp),
+                        )
                     }
                 }
             },
@@ -254,72 +295,89 @@ fun DenaApp(database: DenaDatabase) {
                         )
                     }
                     Column(modifier = Modifier.fillMaxSize()) {
-                        when (selectedTab) {
-                            0 -> IOweScreen(
-                                viewModel = viewModel,
-                                summaryTotal = summaryIOwe,
-                                summaryCount = countIOwe,
-                                onDebtClick = { debt -> selectedDebtId = debt.id },
-                            )
-                            1 -> OwedToMeScreen(
-                                viewModel = viewModel,
-                                summaryTotal = summaryOwedToMe,
-                                summaryCount = countOwedToMe,
-                                onDebtClick = { debt -> selectedDebtId = debt.id },
-                            )
-                                    2 -> SettingsScreen(
-                                        themeMode = themeState.themeMode,
-                                        onThemeChange = { newMode ->
-                                            themeState = themeState.copy(themeMode = newMode)
-                                            prefs.setThemeMode(newMode)
-                                        },
-                                        followSystemTheme = themeState.followSystemTheme,
-                                        onFollowSystemThemeChange = { v ->
-                                            themeState = themeState.copy(
-                                                followSystemTheme = v,
-                                                themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
-                                            )
-                                            prefs.setFollowSystemTheme(v)
-                                            prefs.setThemeMode(themeState.themeMode)
-                                        },
-                                        manualDark = themeState.manualDark,
-                                        onDarkModeChange = { v ->
-                                            themeState = themeState.copy(manualDark = v)
-                                            prefs.setDarkMode(v)
-                                        },
-                                        dynamicColorsEnabled = themeState.dynamicColorsEnabled,
-                                        onDynamicColorsChange = { v ->
-                                            themeState = themeState.copy(
-                                                dynamicColorsEnabled = v,
-                                                paletteEnabled = if (v) false else themeState.paletteEnabled,
-                                                themeMode = if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM
-                                            )
-                                            prefs.setDynamicColorsEnabled(v)
-                                            prefs.setThemeMode(themeState.themeMode)
-                                            if (v) prefs.setPaletteEnabled(false)
-                                        },
-                                        paletteId = themeState.paletteId,
-                                        onPaletteChange = { newId ->
-                                            themeState = themeState.copy(paletteId = newId)
-                                            prefs.setPaletteId(newId)
-                                        },
-                                        paletteEnabled = themeState.paletteEnabled,
-                                        onPaletteEnabledChange = { enabled ->
-                                            themeState = themeState.copy(paletteEnabled = enabled)
-                                            prefs.setPaletteEnabled(enabled)
-                                        },
-                                        dynamicScheme = themeState.dynamicScheme,
-                                        onDynamicSchemeChange = { newScheme ->
-                                            themeState = themeState.copy(dynamicScheme = newScheme)
-                                            prefs.setDynamicScheme(newScheme)
-                                        },
-                                        fontSize = themeState.fontSize,
-                                        onFontSizeChange = { newSize ->
-                                            themeState = themeState.copy(fontSize = newSize)
-                                            prefs.setFontSize(newSize)
-                                        },
-                                        database = database,
+                        if (selectedTab == 2) {
+                            SettingsScreen(
+                                themeMode = themeState.themeMode,
+                                onThemeChange = { newMode ->
+                                    themeState = themeState.copy(themeMode = newMode)
+                                    prefs.setThemeMode(newMode)
+                                },
+                                followSystemTheme = themeState.followSystemTheme,
+                                onFollowSystemThemeChange = { v ->
+                                    themeState = themeState.copy(
+                                        followSystemTheme = v,
+                                        themeMode = if (v) DenaThemeMode.SYSTEM else DenaThemeMode.LIGHT
                                     )
+                                    prefs.setFollowSystemTheme(v)
+                                    prefs.setThemeMode(themeState.themeMode)
+                                },
+                                manualDark = themeState.manualDark,
+                                onDarkModeChange = { v ->
+                                    themeState = themeState.copy(manualDark = v)
+                                    prefs.setDarkMode(v)
+                                },
+                                dynamicColorsEnabled = themeState.dynamicColorsEnabled,
+                                onDynamicColorsChange = { v ->
+                                    themeState = themeState.copy(
+                                        dynamicColorsEnabled = v,
+                                        paletteEnabled = if (v) false else themeState.paletteEnabled,
+                                        themeMode = if (v) DenaThemeMode.DYNAMIC else DenaThemeMode.SYSTEM
+                                    )
+                                    prefs.setDynamicColorsEnabled(v)
+                                    prefs.setThemeMode(themeState.themeMode)
+                                    if (v) prefs.setPaletteEnabled(false)
+                                },
+                                paletteId = themeState.paletteId,
+                                onPaletteChange = { newId ->
+                                    themeState = themeState.copy(paletteId = newId)
+                                    prefs.setPaletteId(newId)
+                                },
+                                paletteEnabled = themeState.paletteEnabled,
+                                onPaletteEnabledChange = { enabled ->
+                                    themeState = themeState.copy(paletteEnabled = enabled)
+                                    prefs.setPaletteEnabled(enabled)
+                                },
+                                dynamicScheme = themeState.dynamicScheme,
+                                onDynamicSchemeChange = { newScheme ->
+                                    themeState = themeState.copy(dynamicScheme = newScheme)
+                                    prefs.setDynamicScheme(newScheme)
+                                },
+                                fontSize = themeState.fontSize,
+                                onFontSizeChange = { newSize ->
+                                    themeState = themeState.copy(fontSize = newSize)
+                                    prefs.setFontSize(newSize)
+                                },
+                                fontKey = themeState.fontKey,
+                                onFontKeyChange = { newKey ->
+                                    themeState = themeState.copy(fontKey = newKey)
+                                    prefs.setAppFont(newKey)
+                                },
+                                database = database,
+                            )
+                        } else {
+                            HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.fillMaxSize(),
+                                userScrollEnabled = true,
+                            ) { page ->
+                                when (page) {
+                                    0 -> IOweScreen(
+                                        viewModel = viewModel,
+                                        summaryTotal = summaryIOwe,
+                                        summaryCount = countIOwe,
+                                        onDebtClick = { debt -> selectedDebtId = debt.id },
+                                        listState = listStateIOwe,
+                                    )
+                                    1 -> OwedToMeScreen(
+                                        viewModel = viewModel,
+                                        summaryTotal = summaryOwedToMe,
+                                        summaryCount = countOwedToMe,
+                                        onDebtClick = { debt -> selectedDebtId = debt.id },
+                                        listState = listStateOwedToMe,
+                                    )
+                                    else -> Box(modifier = Modifier.fillMaxSize())
+                                }
+                            }
                         }
                     }
                 }
