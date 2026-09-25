@@ -17,12 +17,21 @@ data class Debt(
     val category: String, // e.g., "Rent", "Groceries"
     val notes: String,
     val contactPhone: String? = null,
+    val relationship: String = "other",
     val creationDate: Long = System.currentTimeMillis(), // Manually set date
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val isClosed: Boolean = false, // true when fully paid (remainingBalance <= 0.005); auto-reopens on new debt
 ) {
     companion object {
+        val RELATIONSHIPS = listOf("friend", "family", "colleague", "business", "other")
+        fun labelForRelationship(raw: String): String = when (raw.lowercase(java.util.Locale.US)) {
+            "friend" -> "Friend"
+            "family" -> "Family"
+            "colleague" -> "Colleague"
+            "business" -> "Business"
+            else -> "Other"
+        }
         fun fromDomain(
             contactName: String,
             contactAvatar: String? = null,
@@ -34,6 +43,7 @@ data class Debt(
             category: String = "Other",
             notes: String = "",
             contactPhone: String? = null,
+            relationship: String = "other",
             creationDate: Long = System.currentTimeMillis(),
         ): Debt = Debt(
             principalAmount = principalAmount,
@@ -47,6 +57,7 @@ data class Debt(
             category = category,
             notes = notes,
             contactPhone = contactPhone,
+            relationship = relationship.lowercase(java.util.Locale.US),
             creationDate = creationDate,
         )
     }

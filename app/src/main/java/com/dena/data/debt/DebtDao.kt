@@ -33,4 +33,7 @@ interface DebtDao {
 
     @Query("SELECT * FROM debts")
     suspend fun getAllOnce(): List<Debt>
+
+    @Query("DELETE FROM debts")
+    suspend fun deleteAll()
 }

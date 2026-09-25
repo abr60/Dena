@@ -25,12 +25,24 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE debts ADD COLUMN relationship TEXT NOT NULL DEFAULT 'other'")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS message_templates (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "name TEXT NOT NULL, body TEXT NOT NULL, createdAt INTEGER NOT NULL)"
+        )
+    }
+}
+
 @Database(
-    entities = [Debt::class, Transaction::class],
-    version = 3,
+    entities = [Debt::class, Transaction::class, com.dena.data.template.MessageTemplate::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class DenaDatabase : RoomDatabase() {
     abstract fun debtDao(): DebtDao
     abstract fun transactionDao(): TransactionDao
+    abstract fun templateDao(): com.dena.data.template.MessageTemplateDao
 }

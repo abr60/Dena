@@ -90,7 +90,6 @@ fun SettingsScreen(
     var isUnlocked by remember { mutableStateOf(prefs.isUnlocked()) }
     var tapCount by remember { mutableStateOf(0) }
     var lastTapMs by remember { mutableStateOf(0L) }
-    var showDataSheet by remember { mutableStateOf(false) }
     
     val currentPalette = PaletteRegistry.find(paletteId)
 
@@ -127,6 +126,8 @@ fun SettingsScreen(
                 onUnlock = { isUnlocked = true; prefs.setUnlocked(true) }
             ) { subpage = null }
             "userinterface" -> UserPreferencesSubpage(database, onBack = { subpage = null })
+            "templates" -> TemplateSubpage(database = database, onBack = { subpage = null })
+            "backup" -> BackupSubpage(database = database, onBack = { subpage = null })
             "update" -> UpdateSubpage(onBack = { subpage = null })
             "about" -> AboutSubpage(onBack = { subpage = null })
             else -> Column(
@@ -163,7 +164,8 @@ fun SettingsScreen(
                 }
 
                 SettingsGroup {
-                    NavRow(label = "Data", icon = Icons.Filled.Storage, caption = "Backup & restore", onClick = { showDataSheet = true }, showDivider = true)
+                    NavRow(label = "Message Templates", icon = Icons.Filled.Message, caption = "Custom reminder messages", onClick = { subpage = "templates" }, showDivider = true)
+                    NavRow(label = "Data and storage", icon = Icons.Filled.Storage, caption = "Backup, restore & data management", onClick = { subpage = "backup" }, showDivider = true)
                     NavRow(label = "Recent Activity", icon = Icons.AutoMirrored.Filled.List, caption = "All transactions & retention", onClick = { subpage = "activity" }, showDivider = true)
                 }
 
@@ -176,9 +178,6 @@ fun SettingsScreen(
         }
     }
 
-    if (showDataSheet) {
-        DataBackupBottomSheet(database = database, onDismiss = { showDataSheet = false })
-    }
 }
 
 @Composable
@@ -378,8 +377,28 @@ fun UserPreferencesSubpage(database: DenaDatabase?, onBack: () -> Unit) {
         var showPercentage by remember { mutableStateOf(prefs.showPercentage()) }
         var showContactNumber by remember { mutableStateOf(prefs.showContactNumber()) }
         var showDateHeaders by remember { mutableStateOf(prefs.showDateHeaders()) }
+        var showManualPhone by remember { mutableStateOf(prefs.showManualPhoneField()) }
+        var terminologyMode by remember { mutableStateOf(prefs.getTerminologyMode()) }
 
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            SectionHeader("TERMINOLOGY")
+            SettingsGroup {
+                val termOptions = listOf(
+                    SelectOption(label = "Owed / I Owe", originalIndex = 0),
+                    SelectOption(label = "Lent / Borrowed", originalIndex = 1),
+                )
+                val currentTerm = if (terminologyMode == DenaPreferences.TERM_OWED) "Owed / I Owe" else "Lent / Borrowed"
+                DenaSelect(
+                    value = currentTerm,
+                    options = termOptions,
+                    onSelect = { idx ->
+                        val mode = if (idx == 0) DenaPreferences.TERM_OWED else DenaPreferences.TERM_LENT_BORROWED
+                        terminologyMode = mode
+                        prefs.setTerminologyMode(mode)
+                    },
+                    placeholder = "Select terminology",
+                )
+            }
             SectionHeader("LOCALIZATION")
             SettingsGroup {
                 Box(modifier = Modifier.fillMaxWidth().clickable { showLanguagePicker = true }) {
@@ -402,6 +421,13 @@ fun UserPreferencesSubpage(database: DenaDatabase?, onBack: () -> Unit) {
                     caption = "Display phone number on debt cards",
                     checked = showContactNumber,
                     onCheckedChange = { showContactNumber = it; prefs.setShowContactNumber(it) },
+                    showDivider = true,
+                )
+                ToggleRow(
+                    label = "Phone number field",
+                    caption = "Show phone fields in debt form & messaging (off = auto-fill from contacts)",
+                    checked = showManualPhone,
+                    onCheckedChange = { showManualPhone = it; prefs.setShowManualPhoneField(it) },
                     showDivider = false,
                 )
             }
@@ -561,6 +587,309 @@ fun AboutSubpage(onBack: () -> Unit) {
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TemplateSubpage(database: DenaDatabase?, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val templates by (database?.templateDao()?.observeAll()?.collectAsStateWithLifecycle(initialValue = emptyList()) ?: remember { mutableStateOf(emptyList()) })
+    var showAdd by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<com.dena.data.template.MessageTemplate?>(null) }
+    SettingsSubpageScaffold(title = "Message Templates", onBack = onBack) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Placeholders: {name} {amount} {relationship} {dueDate} {duePart}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Text("Add Template") }
+            templates.forEach { t ->
+                Card(modifier = Modifier.fillMaxWidth().clickable { editing = t }, shape = RoundedCornerShape(12.dp)) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(t.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            IconButton(onClick = { scope.launch(Dispatchers.IO) { database?.templateDao()?.delete(t) } }) { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error) }
+                        }
+                        Text(t.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
+                    }
+                }
+            }
+            if (templates.isEmpty()) Text("No templates yet — add one.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    if (showAdd || editing != null) {
+        val isEdit = editing != null
+        var name by remember(editing) { mutableStateOf(editing?.name ?: "") }
+        var body by remember(editing) { mutableStateOf(editing?.body ?: "") }
+        val canSave = name.isNotBlank() && body.isNotBlank()
+        ModalBottomSheet(
+            onDismissRequest = { showAdd = false; editing = null },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(if (isEdit) "Edit Template" else "New Template", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Placeholders: {name} {amount} {relationship} {dueDate} {duePart}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(value = body, onValueChange = { body = it }, label = { Text("Body") }, placeholder = { Text("Hi {name}, ... {amount}{duePart}") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), minLines = 3, maxLines = 6)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = { showAdd = false; editing = null }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Cancel") }
+                    Button(
+                        onClick = {
+                            if (!canSave) return@Button
+                            scope.launch(Dispatchers.IO) {
+                                if (isEdit) database?.templateDao()?.update(editing!!.copy(name = name.trim(), body = body))
+                                else database?.templateDao()?.insert(com.dena.data.template.MessageTemplate(name = name.trim(), body = body))
+                            }
+                            showAdd = false; editing = null
+                        },
+                        enabled = canSave,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { DenaPreferences(context) }
+    var backupDirUri by remember { mutableStateOf(prefs.getBackupDirUri()) }
+    var backupSchedule by remember { mutableStateOf(prefs.getBackupSchedule()) }
+    val contentResolver = context.contentResolver
+    val dirPicker = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) } catch (_: Exception) {}
+            prefs.setBackupDirUri(uri.toString()); backupDirUri = uri.toString()
+            Toast.makeText(context, "Backup folder set", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val debts = database?.debtDao()?.getAllOnce() ?: emptyList()
+                    val txs = database?.transactionDao()?.getAllOnce() ?: emptyList()
+                    val templates = try { database?.templateDao()?.getAllOnce() ?: emptyList() } catch (_: Exception) { emptyList() }
+                    val prefsSnap = BackupHelper.capturePreferences(context)
+                    val json = BackupHelper.exportProfileToJson(debts, txs, templates, prefsSnap)
+                    contentResolver.openOutputStream(uri)?.use { out -> out.write(json.toByteArray()) }
+                    val filename = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.json"
+                    withContext(Dispatchers.Main) { Toast.makeText(context, "Backup saved as $filename", Toast.LENGTH_LONG).show() }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) { Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show() }
+                }
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val content = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    if (content == null) {
+                        withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_LONG).show() }
+                        return@launch
+                    }
+                    val decoded = BackupHelper.decodeBackupString(content)
+                    if (decoded == null) {
+                        withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_LONG).show() }
+                        return@launch
+                    }
+                    val backup = BackupHelper.parseBackup(decoded)
+                    if (backup == null) {
+                        withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: invalid format", Toast.LENGTH_LONG).show() }
+                        return@launch
+                    }
+                    var importError: String? = null
+                    try {
+                        val db = database ?: throw IllegalStateException("Database unavailable")
+                        db.withTransaction {
+                            // Full replace: wipe existing data
+                            db.debtDao().deleteAll()
+                            db.transactionDao().deleteAll()
+                            try { db.templateDao().deleteAll() } catch (_: Exception) {}
+                            val idMap = mutableMapOf<Long, Long>()
+                            for (d in backup.debts) {
+                                val newId = db.debtDao().insert(d.copy(id = 0))
+                                idMap[d.id] = newId
+                            }
+                            for (t in backup.txs) {
+                                val mapped = idMap[t.debtId] ?: t.debtId
+                                if (db.debtDao().getById(mapped) == null) continue
+                                db.transactionDao().insert(t.copy(id = 0, debtId = mapped))
+                            }
+                            for (tpl in backup.templates) {
+                                try { db.templateDao().insert(tpl.copy(id = 0)) } catch (_: Exception) {}
+                            }
+                        }
+                        backup.preferences?.let { BackupHelper.applyPreferences(context, it) }
+                        // Re-schedule backup worker if schedule was restored
+                        try { com.dena.core.BackupWorker.schedule(context) } catch (_: Exception) {}
+                        withContext(Dispatchers.Main) { backupSchedule = prefs.getBackupSchedule() }
+                    } catch (e: Exception) { importError = e.message }
+                    withContext(Dispatchers.Main) {
+                        if (importError != null) Toast.makeText(context, "Import failed: $importError", Toast.LENGTH_LONG).show()
+                        else {
+                            val tplCount = backup.templates.size
+                            val prefNote = if (backup.preferences != null) " + settings" else ""
+                            Toast.makeText(context, "Restored ${backup.debts.size} debts, ${backup.txs.size} payments, $tplCount templates$prefNote — restart app", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
+                }
+            }
+        }
+    }
+    fun displayPath(uriStr: String): String {
+        if (uriStr.isBlank()) return "Not set"
+        return try {
+            if (uriStr.contains("primary:")) {
+                val after = uriStr.substringAfter("primary:").substringBefore("/").ifBlank { uriStr.substringAfter("primary:") }
+                // handle encoded
+                val decoded = java.net.URLDecoder.decode(after, "UTF-8")
+                "/storage/emulated/0/$decoded".trimEnd('/')
+            } else {
+                val df = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, android.net.Uri.parse(uriStr))
+                df?.name?.let { "/storage/.../$it" } ?: uriStr
+            }
+        } catch (_: Exception) { uriStr }
+    }
+    val lastBackupFmt = remember(backupDirUri) { } // keep recompose anchor
+    val lastBackupTime = prefs.getLastBackupTime()
+    val lastBackupText = if (lastBackupTime == 0L) "Last backup: Never"
+        else "Last backup: ${SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.US).format(java.util.Date(lastBackupTime))}"
+    var showSchedulePicker by remember { mutableStateOf(false) }
+    fun doBackupToFolder() {
+        if (backupDirUri.isBlank()) {
+            // no folder — fall back to system picker with dated name
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date())
+            exportLauncher.launch("dena-backup-$today.json")
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val debts = database?.debtDao()?.getAllOnce() ?: emptyList()
+                val txs = database?.transactionDao()?.getAllOnce() ?: emptyList()
+                val templates = try { database?.templateDao()?.getAllOnce() ?: emptyList() } catch (_: Exception) { emptyList() }
+                val prefsSnap = BackupHelper.capturePreferences(context)
+                val json = BackupHelper.exportProfileToJson(debts, txs, templates, prefsSnap)
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date())
+                val fileName = "dena-backup-$today.json"
+                val treeUri = android.net.Uri.parse(backupDirUri)
+                val dir = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+                var file = dir?.findFile(fileName)
+                if (file == null) file = dir?.createFile("application/json", fileName)
+                context.contentResolver.openOutputStream(file!!.uri, "w")?.use { it.write(json.toByteArray()) }
+                prefs.setLastBackupTime(System.currentTimeMillis())
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Backup saved as $fileName", Toast.LENGTH_LONG).show() }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    SettingsSubpageScaffold(title = "Data and storage", onBack = onBack) {
+        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            // Storage Location Section — path directly below title
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().clickable { dirPicker.launch(null) }) {
+                    Text(
+                        text = displayPath(backupDirUri),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (backupDirUri.isBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    )
+                }
+                Text(
+                    text = "Used for automatic backups, debt records, and app settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Backup and restore
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeader("Backup and restore")
+                Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SettingsGroup {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                            Button(
+                                onClick = { doBackupToFolder() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp, topEnd = 4.dp, bottomEnd = 4.dp),
+                            ) { Text("Back up", fontWeight = FontWeight.SemiBold) }
+                            OutlinedButton(
+                                onClick = { importLauncher.launch(arrayOf("*/*")) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 12.dp, bottomEnd = 12.dp),
+                            ) { Text("Restore", fontWeight = FontWeight.Medium) }
+                        }
+                        Text(
+                            text = "Backups save as dena-backup.json containing debts, templates, and settings.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            // Automatic backup
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeader("Automatic backup")
+                SettingsGroup {
+                    Box(modifier = Modifier.fillMaxWidth().clickable { showSchedulePicker = true }) {
+                        val schedDisplay = when (backupSchedule) {
+                            DenaPreferences.SCHEDULE_DAILY -> "Daily"
+                            DenaPreferences.SCHEDULE_WEEKLY -> "Weekly"
+                            DenaPreferences.SCHEDULE_MONTHLY -> "Monthly"
+                            else -> "Off"
+                        }
+                        SettingsRow(label = "Schedule", value = schedDisplay, showDivider = false)
+                    }
+                }
+                Text(
+                    text = "Runs automatically in the background, even when the app is closed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (showSchedulePicker) {
+        AlertDialog(
+            onDismissRequest = { showSchedulePicker = false },
+            title = { Text("Automatic backup") },
+            text = {
+                Column {
+                    val options = listOf(
+                        DenaPreferences.SCHEDULE_DAILY to "Daily",
+                        DenaPreferences.SCHEDULE_WEEKLY to "Weekly",
+                        DenaPreferences.SCHEDULE_MONTHLY to "Monthly",
+                        DenaPreferences.SCHEDULE_DISABLED to "Off — only when I tap \"Back up\"",
+                    )
+                    options.forEach { (value, label) ->
+                        Row(modifier = Modifier.fillMaxWidth().clickable {
+                            backupSchedule = value; prefs.setBackupSchedule(value)
+                            com.dena.core.BackupWorker.schedule(context)
+                            showSchedulePicker = false
+                        }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = backupSchedule == value, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSchedulePicker = false }) { Text("Done") } },
+        )
     }
 }
 

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dena.core.CurrencyRegistry
@@ -117,6 +117,7 @@ fun DebtList(
     sort: DebtSort = DebtSort.NEWEST,
     showDateHeaders: Boolean = false,
     listState: LazyListState = rememberLazyListState(),
+    relationshipFilter: String? = null,
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
@@ -126,9 +127,11 @@ fun DebtList(
     val showContactNumber = prefs.showContactNumber()
     val dateFmt = SimpleDateFormat("M/d/yy", Locale.US)
 
-    val filtered = remember(debts, searchQuery) {
-        if (searchQuery.isBlank()) debts
-        else debts.filter { it.contactName.contains(searchQuery, ignoreCase = true) }
+    val filtered = remember(debts, searchQuery, relationshipFilter) {
+        var list = debts
+        if (relationshipFilter != null) list = list.filter { it.relationship == relationshipFilter }
+        if (searchQuery.isNotBlank()) list = list.filter { it.contactName.contains(searchQuery, ignoreCase = true) }
+        list
     }
     if (filtered.isEmpty() && searchQuery.isNotBlank()) {
         Text(
@@ -234,13 +237,21 @@ private fun DebtCardItem(
             Column(
                 modifier = Modifier.weight(1f).padding(start = 12.dp, end = 10.dp),
             ) {
-                Text(
-                    debt.contactName,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium, fontSize = 16.sp),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                )
-                if (showContactNumber && !debt.contactPhone.isNullOrBlank()) {
+                    Text(
+                        debt.contactName,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium, fontSize = 16.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                    if (debt.relationship != "other") {
+                        Text(
+                            text = Debt.labelForRelationship(debt.relationship),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                        )
+                    }
+                    if (showContactNumber && !debt.contactPhone.isNullOrBlank()) {
                     Text(
                         text = debt.contactPhone,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
@@ -258,7 +269,7 @@ private fun DebtCardItem(
                 }
             }
             Column(
-                modifier = Modifier.width(112.dp),
+                modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.End,
             ) {
                 if (showPercentage) {
@@ -267,6 +278,8 @@ private fun DebtCardItem(
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 val sym = if (debt.currency.isNotBlank()) CurrencyRegistry.symbolFor(debt.currency) else currencySymbol
@@ -275,6 +288,8 @@ private fun DebtCardItem(
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (closed) {
                     Text(
@@ -295,6 +310,8 @@ private fun DebtCardItem(
                         fontWeight = FontWeight.SemiBold,
                         color = balColor,
                         maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

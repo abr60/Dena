@@ -89,6 +89,7 @@ import com.dena.ui.components.ScreenContainer
 import com.dena.ui.screens.DebtDetailScreen
 import com.dena.ui.screens.DebtFormScreen
 import com.dena.ui.screens.IOweScreen
+import com.dena.ui.screens.OnboardingScreen
 import com.dena.ui.screens.OwedToMeScreen
 import com.dena.ui.screens.SettingsScreen
 import kotlinx.coroutines.flow.map
@@ -98,11 +99,14 @@ private data class DenaDestination(
     val icon: ImageVector,
 )
 
-private val Destinations = listOf(
-    DenaDestination("I Borrowed", Icons.AutoMirrored.Filled.List),
-    DenaDestination("I Lent", Icons.Filled.Person),
-    DenaDestination("Settings", Icons.Filled.Settings),
-)
+private fun destinationsFor(mode: String): List<DenaDestination> {
+    val labels = com.dena.core.Terminology.labels(mode)
+    return listOf(
+        DenaDestination(labels.tabBorrowed, Icons.AutoMirrored.Filled.List),
+        DenaDestination(labels.tabLent, Icons.Filled.Person),
+        DenaDestination("Settings", Icons.Filled.Settings),
+    )
+}
 
 @Composable
 fun DenaApp(database: DenaDatabase) {
@@ -118,6 +122,7 @@ fun DenaApp(database: DenaDatabase) {
     val countIOwe by viewModel.countIOwe.collectAsStateWithLifecycle()
 
     val prefs = remember(context) { com.dena.core.DenaPreferences(context) }
+    val destinations = destinationsFor(prefs.getTerminologyMode())
     val scope = rememberCoroutineScope()
     var pendingUpdate by remember { mutableStateOf<com.dena.core.ReleaseInfo?>(null) }
     var showUpdateDialog by remember { mutableStateOf(false) }
@@ -153,6 +158,22 @@ fun DenaApp(database: DenaDatabase) {
             activeListState.firstVisibleItemIndex == 0 || activeListState.firstVisibleItemScrollOffset == 0
         }
     }
+    // Background backfill: legacy debts without phones matched against device contacts (idempotent, no-op without READ_CONTACTS)
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try { com.dena.core.ContactPhoneMigrator.migrateIfNeeded(context, database.debtDao()) } catch (_: Exception) {}
+            try {
+                val prefsInner = com.dena.core.DenaPreferences(context)
+                if (!prefsInner.isTemplatesSeeded() && database.templateDao().count() == 0) {
+                    com.dena.core.TemplateEngine.defaultTemplates.forEach { (name, body) ->
+                        database.templateDao().insert(com.dena.data.template.MessageTemplate(name = name, body = body))
+                    }
+                    prefsInner.setTemplatesSeeded(true)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     val pagerState = rememberPagerState(
         initialPage = selectedTab.coerceAtMost(1),
         pageCount = { 2 },
@@ -221,6 +242,11 @@ fun DenaApp(database: DenaDatabase) {
         manualDark = themeState.manualDark,
         fontKey = themeState.fontKey,
     ) {
+        var showOnboarding by remember { mutableStateOf(!prefs.isOnboardingDone()) }
+        if (showOnboarding) {
+            OnboardingScreen(onDone = { prefs.setOnboardingDone(true); showOnboarding = false })
+            return@DenaTheme
+        }
         Scaffold(
             bottomBar = {
                 if (selectedDebtId == null && !showDebtForm) {
@@ -228,7 +254,7 @@ fun DenaApp(database: DenaDatabase) {
                         containerColor = MaterialTheme.colorScheme.background,
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ) {
-                        Destinations.forEachIndexed { index, destination ->
+                        destinations.forEachIndexed { index, destination ->
                             NavigationBarItem(
                                 selected = selectedTab == index,
                                 onClick = {

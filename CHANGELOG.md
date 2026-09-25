@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.7.0-alpha — 2026-09-25
+- **Relationship tagging** — DB v4 `Debt.relationship` (`family`/`friend`/`colleague`/`business`/`other`); chip selector on create form, spinner on detail screen, filter chips on I Lent / I Borrowed lists (`MIGRATION_3_4`).
+- **Message templates** — new `message_templates` table (DB v4) with 3 seeded defaults; CRUD in `Settings → Templates` (bottom-sheet editor); `{name}`/`{amount}`/`{date}` placeholders via `TemplateEngine`.
+- **Unified backup v2** — single `dena-backup` JSON covers debts (+ transactions, phone, relationship), templates, and preferences; full-replace restore; scheduled backups via WorkManager (`BackupWorker`) with last-backup timestamp.
+- **Backup & Data subpage** — replaces bottom sheet: storage folder picker + path display, Back up / Restore segmented actions, automatic-backup schedule (Off / Daily / Weekly).
+- **Onboarding** — 3-page first-run pager with persistent flag.
+- **Contacts** — inline device-contact suggestions as you type (DB + device merge, debounced); auto-fill phone from contacts; manual phone field toggle (default off); one-time migration backfills missing phones.
+- **Terminology preference** — Owed/Lent vs Lent/Borrowed label mode.
+- **PDF statements** — clean-table redesign: solid dark header, summary card (Remaining + Due Date + Status), full-row soft tints for payments, ink-only amounts, direction-aware title (Debtor / Creditor Statement), respects Show decimals, repeated header on continuation pages.
+- **Detail screen** — left-aligned name with rename dialog (contact suggestions + phone autofill); templates managed only in Settings (picker removed from message sheet).
+- **Fix** — balance truncation at thousands separator with decimals on (right column now flexible + no-wrap ellipsis).
+
 ## v0.6.10-alpha — 2026-09-21
 - **Space Grotesk default** — replaces Inter as the bundled UI font (`SpaceGrotesk-Variable.ttf`); Inter TTFs removed; legacy `inter` pref migrates to `spacegrotesk`. Font picker: Space Grotesk / JetBrains Mono / System. JetBrains Mono now loads all four weights.
 - **Font & display scale sliders** — continuous Font size + Display size (85–130%) replace Small/Medium/Large + `ScalePickerSheet`; legacy `font_size` migrates to `font_scale`.

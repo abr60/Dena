@@ -71,6 +71,7 @@ class DebtViewModel(
         dateOpened: Long = System.currentTimeMillis(),
         creationDate: Long = System.currentTimeMillis(),
         contactPhone: String? = null,
+        relationship: String = "other",
     ) {
         viewModelScope.launch {
             val debt = Debt.fromDomain(
@@ -84,6 +85,7 @@ class DebtViewModel(
                 category = category,
                 notes = notes,
                 contactPhone = contactPhone?.takeIf { it.isNotBlank() },
+                relationship = relationship,
                 creationDate = creationDate,
             )
             val newId = repository.insertDebt(debt)
@@ -131,6 +133,14 @@ class DebtViewModel(
             repository.updateDebt(
                 debt.copy(contactPhone = normalized, updatedAt = System.currentTimeMillis()),
             )
+        }
+    }
+
+    fun updateRelationship(debt: Debt, newRelationship: String) {
+        val normalized = newRelationship.lowercase(java.util.Locale.US)
+        if (normalized == debt.relationship || normalized !in Debt.RELATIONSHIPS) return
+        viewModelScope.launch {
+            repository.updateDebt(debt.copy(relationship = normalized, updatedAt = System.currentTimeMillis()))
         }
     }
 

@@ -98,6 +98,31 @@ class DenaPreferences(context: Context) {
     }
     fun setAppFont(v: String) { prefs.edit().putString(KEY_APP_FONT, v).apply() }
 
+    fun showManualPhoneField(): Boolean = prefs.getBoolean(KEY_SHOW_MANUAL_PHONE_FIELD, false)
+    fun setShowManualPhoneField(v: Boolean) { prefs.edit().putBoolean(KEY_SHOW_MANUAL_PHONE_FIELD, v).apply() }
+
+    fun isOnboardingDone(): Boolean = prefs.getBoolean(KEY_ONBOARDING_DONE, false)
+    fun setOnboardingDone(v: Boolean) { prefs.edit().putBoolean(KEY_ONBOARDING_DONE, v).apply() }
+
+    // Contact phone backfill: run once after permission granted; re-runs if new legacy debts appear
+    fun isPhoneMigrationDone(): Boolean = prefs.getBoolean(KEY_PHONE_MIGRATION_DONE, false)
+    fun setPhoneMigrationDone(v: Boolean) { prefs.edit().putBoolean(KEY_PHONE_MIGRATION_DONE, v).apply() }
+
+    // Terminology: "lent_borrowed" (Mode B, default) vs "owed" (Mode A)
+    fun getTerminologyMode(): String = prefs.getString(KEY_TERMINOLOGY_MODE, TERM_LENT_BORROWED) ?: TERM_LENT_BORROWED
+    fun setTerminologyMode(v: String) { prefs.edit().putString(KEY_TERMINOLOGY_MODE, v).apply() }
+
+    // One-tap backup
+    fun getBackupDirUri(): String = prefs.getString(KEY_BACKUP_DIR_URI, "") ?: ""
+    fun setBackupDirUri(v: String) { prefs.edit().putString(KEY_BACKUP_DIR_URI, v).apply() }
+    fun getBackupSchedule(): String = prefs.getString(KEY_BACKUP_SCHEDULE, SCHEDULE_DISABLED) ?: SCHEDULE_DISABLED
+    fun setBackupSchedule(v: String) { prefs.edit().putString(KEY_BACKUP_SCHEDULE, v).apply() }
+    fun isTemplatesSeeded(): Boolean = prefs.getBoolean(KEY_TEMPLATES_SEEDED, false)
+    fun setTemplatesSeeded(v: Boolean) { prefs.edit().putBoolean(KEY_TEMPLATES_SEEDED, v).apply() }
+
+    fun getLastBackupTime(): Long = prefs.getLong(KEY_LAST_BACKUP_TIME, 0L)
+    fun setLastBackupTime(v: Long) { prefs.edit().putLong(KEY_LAST_BACKUP_TIME, v).apply() }
+
     companion object {
         const val PREFS_NAME = "dena_preferences"
         const val KEY_THEME_MODE = "theme_mode"
@@ -133,5 +158,19 @@ class DenaPreferences(context: Context) {
         const val LANG_BN = "bn"
         const val CURRENCY_BDT = "BDT"
         const val CURRENCY_USD = "USD"
+        const val KEY_SHOW_MANUAL_PHONE_FIELD = "show_manual_phone_field"
+        const val KEY_ONBOARDING_DONE = "onboarding_done"
+        const val KEY_PHONE_MIGRATION_DONE = "phone_migration_done_v1"
+        const val KEY_TERMINOLOGY_MODE = "terminology_mode"
+        const val TERM_OWED = "owed"
+        const val TERM_LENT_BORROWED = "lent_borrowed"
+        const val KEY_BACKUP_DIR_URI = "backup_dir_uri"
+        const val KEY_BACKUP_SCHEDULE = "backup_schedule"
+        const val SCHEDULE_DISABLED = "disabled"
+        const val SCHEDULE_DAILY = "daily"
+        const val SCHEDULE_WEEKLY = "weekly"
+        const val SCHEDULE_MONTHLY = "monthly"
+        const val KEY_TEMPLATES_SEEDED = "templates_seeded"
+        const val KEY_LAST_BACKUP_TIME = "last_backup_time"
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
@@ -110,10 +111,10 @@ fun DebtDetailScreen(
 
     val isOwedToMe = debt.direction == "owed_to_me"
     val context = LocalContext.current
-    var editingName by remember(debt.id) { mutableStateOf(false) }
+    var showRenameDialog by remember(debt.id) { mutableStateOf(false) }
     var editName by remember(debt.id) { mutableStateOf(debt.contactName) }
     fun commitRename() {
-        editingName = false
+        showRenameDialog = false
         viewModel.renameDebt(debt, editName)
         editName = editName.trim().ifBlank { debt.contactName }
     }
@@ -123,30 +124,18 @@ fun DebtDetailScreen(
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
     Column(modifier = Modifier.fillMaxSize()) {
-        androidx.compose.material3.CenterAlignedTopAppBar(
+        androidx.compose.material3.TopAppBar(
             title = {
-                if (editingName) {
-                    OutlinedTextField(
-                        value = editName,
-                        onValueChange = { editName = it },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { commitRename() }),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                } else {
-                    Text(
-                        debt.contactName,
-                        modifier = Modifier.combinedClickable(
-                            onClick = {},
-                            onDoubleClick = {
-                                editName = debt.contactName
-                                editingName = true
-                            },
-                        ),
-                    )
-                }
+                Text(
+                    debt.contactName,
+                    modifier = Modifier.combinedClickable(
+                        onClick = {},
+                        onDoubleClick = {
+                            editName = debt.contactName
+                            showRenameDialog = true
+                        },
+                    ),
+                )
             },
             navigationIcon = {
                 IconButton(onClick = onBack) {
@@ -235,6 +224,28 @@ fun DebtDetailScreen(
                             text = if (!debt.contactPhone.isNullOrBlank()) "Phone: ${debt.contactPhone}" else "Add phone number",
                             style = MaterialTheme.typography.bodySmall,
                             color = if (!debt.contactPhone.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("Relationship:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        androidx.compose.material3.AssistChip(
+                            onClick = { /* cycle? use dialog */ },
+                            label = { Text(com.dena.data.debt.Debt.labelForRelationship(debt.relationship)) },
+                            trailingIcon = {
+                                var expanded by remember { mutableStateOf(false) }
+                                Box {
+                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.clickable { expanded = true })
+                                    androidx.compose.material3.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                        com.dena.data.debt.Debt.RELATIONSHIPS.forEach { key ->
+                                            androidx.compose.material3.DropdownMenuItem(text = { Text(com.dena.data.debt.Debt.labelForRelationship(key)) }, onClick = { expanded = false; viewModel.updateRelationship(debt, key) })
+                                        }
+                                    }
+                                }
+                            }
                         )
                     }
                     if (debt.notes.isNotBlank()) {
@@ -397,6 +408,22 @@ fun DebtDetailScreen(
         )
     }
 
+    if (showRenameDialog) {
+        RenameDebtDialog(
+            debt = debt,
+            owedList = owedToMeList,
+            iOweList = iOweList,
+            initialName = editName,
+            onDismiss = { showRenameDialog = false },
+            onSave = { newName, newPhone ->
+                if (newName.isNotBlank() && newName != debt.contactName) viewModel.renameDebt(debt, newName)
+                if (!newPhone.isNullOrBlank() && debt.contactPhone.isNullOrBlank()) viewModel.updateContactPhone(debt, newPhone)
+                showRenameDialog = false
+                editName = newName
+            },
+        )
+    }
+
     if (showMessageSheet) {
         MessageSheet(
             debt = debt,
@@ -423,6 +450,94 @@ fun DebtDetailScreen(
             }
         )
     }
+}
+
+@Composable
+private fun RenameDebtDialog(
+    debt: com.dena.data.debt.Debt,
+    owedList: List<com.dena.data.debt.Debt>,
+    iOweList: List<com.dena.data.debt.Debt>,
+    initialName: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String?) -> Unit,
+) {
+    val ctx = LocalContext.current
+    var name by remember { mutableStateOf(initialName) }
+    var pendingPhone by remember { mutableStateOf<String?>(null) }
+    var contactsGranted by remember {
+        mutableStateOf(androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+    }
+    val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { g -> contactsGranted = g }
+    var deviceSuggestions by remember { mutableStateOf<List<com.dena.ui.ContactSuggestion>>(emptyList()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { if (!contactsGranted) permLauncher.launch(android.Manifest.permission.READ_CONTACTS) }
+    androidx.compose.runtime.LaunchedEffect(name, contactsGranted) {
+        if (name.isBlank() || !contactsGranted) { deviceSuggestions = emptyList(); return@LaunchedEffect }
+        kotlinx.coroutines.delay(250)
+        val q = name.trim()
+        if (q.isEmpty()) { deviceSuggestions = emptyList(); return@LaunchedEffect }
+        deviceSuggestions = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.dena.ui.queryDeviceContacts(ctx, q) }
+    }
+    val allSuggestions = remember(owedList, iOweList) {
+        val map = LinkedHashMap<String, String?>()
+        (owedList + iOweList).forEach { d ->
+            val k = d.contactName.trim()
+            if (k.isNotEmpty() && !map.containsKey(k)) map[k] = d.contactPhone?.takeIf { it.isNotBlank() }
+        }
+        map.map { (n, p) -> com.dena.ui.ContactSuggestion(n, p) }
+    }
+    val filtered = remember(name, allSuggestions, deviceSuggestions) {
+        if (name.isEmpty()) emptyList()
+        else {
+            val dbMatches = allSuggestions.filter { it.name.contains(name.trim(), ignoreCase = true) && !it.name.equals(name.trim(), ignoreCase = true) }
+            val seen = dbMatches.map { it.name.lowercase(java.util.Locale.US) }.toMutableSet()
+            val devFiltered = deviceSuggestions.filter { it.name.lowercase(java.util.Locale.US) !in seen && !it.name.equals(name.trim(), ignoreCase = true) }
+            (dbMatches + devFiltered).take(6)
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it; pendingPhone = null },
+                        label = { Text("Contact name") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { if (name.trim().isNotBlank()) onSave(name.trim(), pendingPhone) }),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    if (filtered.isNotEmpty()) {
+                        androidx.compose.material3.DropdownMenu(expanded = true, onDismissRequest = {}) {
+                            filtered.forEach { s ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(s.name, style = MaterialTheme.typography.bodyMedium)
+                                            if (!s.phone.isNullOrBlank()) Text(s.phone, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    },
+                                    onClick = {
+                                        name = s.name
+                                        pendingPhone = s.phone
+                                        deviceSuggestions = emptyList()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                if (pendingPhone != null) Text("Phone will be filled: $pendingPhone", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = name.trim().isNotBlank(), onClick = { onSave(name.trim(), pendingPhone) }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 private fun buildReminderMessage(firstName: String, amount: String, isOwedToMe: Boolean, dueDate: Long?): String {
@@ -452,26 +567,53 @@ private fun MessageSheet(
     onSavePhone: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
+    val prefs = remember(ctx) { com.dena.core.DenaPreferences(ctx) }
+    val showPhoneField = prefs.showManualPhoneField()
     val isOwedToMe = debt.direction == "owed_to_me"
     val firstName = debt.contactName.trim().substringBefore(" ").takeIf { it.isNotBlank() } ?: debt.contactName
     var phone by remember(debt.id) { mutableStateOf(debt.contactPhone ?: "") }
     var channel by remember { mutableStateOf("sms") } // sms | wa
     var message by remember(debt.id, dueDate, remainingText) { mutableStateOf(buildReminderMessage(firstName, remainingText, isOwedToMe, dueDate)) }
     val hasPhone = phone.trim().isNotBlank()
+    // When toggle off and phone empty, auto-fill from device contacts by name
+    androidx.compose.runtime.LaunchedEffect(debt.id, debt.contactName) {
+        if (phone.isBlank() && !showPhoneField) {
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                val resolved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    var found: String? = null
+                    try {
+                        ctx.contentResolver.query(
+                            android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
+                            "${android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} = ?",
+                            arrayOf(debt.contactName.trim()), null,
+                        )?.use { c ->
+                            if (c.moveToFirst()) found = c.getString(0)
+                        }
+                    } catch (_: Exception) {}
+                    found
+                }
+                if (!resolved.isNullOrBlank()) phone = resolved!!
+            }
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Message $firstName", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
-                label = { Text("Phone number") },
-                placeholder = { Text("017... or +880...") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-            )
+            if (showPhoneField) {
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone number") },
+                    placeholder = { Text("017... or +880...") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                )
+            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val smsSel = channel == "sms"
                 val waSel = channel == "wa"
@@ -521,7 +663,11 @@ private fun MessageSheet(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             ) { Text(if (channel == "wa") "Send via WhatsApp" else "Send via SMS") }
-            if (!hasPhone) Text("Add a phone number to send directly to $firstName.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!hasPhone) Text(
+                if (showPhoneField) "Add a phone number to send directly to $firstName."
+                else "No saved number for $firstName — enable phone field in Settings to add one.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

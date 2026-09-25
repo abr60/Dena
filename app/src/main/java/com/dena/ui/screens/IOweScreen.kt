@@ -6,11 +6,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,13 +49,15 @@ fun IOweScreen(
     val debts by viewModel.iOwe.collectAsStateWithLifecycle()
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var sort by remember { mutableStateOf(DebtSort.NEWEST) }
+    var relationshipFilter by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
     val symbol = prefs.getCurrencySymbol()
     val showDateHeaders = prefs.showDateHeaders()
+    val labels = com.dena.core.Terminology.labels(prefs.getTerminologyMode())
 
     ScreenContainer(
-        title = "I Owe",
+        title = labels.tabBorrowed,
         searchQuery = searchQuery,
         onSearchChange = { searchQuery = it },
         searchPlaceholder = "Search debtor…",
@@ -75,13 +80,30 @@ fun IOweScreen(
             } else {
                 androidx.compose.foundation.layout.Column {
                     Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FilterChip(
+                            selected = relationshipFilter == null,
+                            onClick = { relationshipFilter = null },
+                            label = { Text("All") },
+                        )
+                        Debt.RELATIONSHIPS.forEach { rel ->
+                            FilterChip(
+                                selected = relationshipFilter == rel,
+                                onClick = { relationshipFilter = rel },
+                                label = { Text(Debt.labelForRelationship(rel)) },
+                            )
+                        }
+                    }
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
                     ) {
                         SortMenuButton(sort = sort, onSortChange = { sort = it })
                     }
                     if (openDebts.isNotEmpty()) {
-                        DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
+                        DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort, showDateHeaders = showDateHeaders, listState = listState, relationshipFilter = relationshipFilter)
                     }
                     AnimatedVisibility(
                         visible = closedDebts.isNotEmpty(),
@@ -95,7 +117,7 @@ fun IOweScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
                             )
-                            DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort, showDateHeaders = showDateHeaders, listState = listState)
+                            DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort, showDateHeaders = showDateHeaders, listState = listState, relationshipFilter = relationshipFilter)
                         }
                     }
                 }

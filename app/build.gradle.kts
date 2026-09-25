@@ -14,8 +14,8 @@ android {
         applicationId = "com.dena"
         minSdk = 24 // floor: LocaleHelper (LocaleList/setLocales) — do not raise (see AGENTS.md)
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.6.10-alpha"
+        versionCode = 18
+        versionName = "0.7.0-alpha"
         resourceConfigurations += listOf("en", "bn") // prunes unused locales from deps — part of 1.3 MB win
     }
 
@@ -105,6 +105,8 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("androidx.navigation:navigation-compose:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
