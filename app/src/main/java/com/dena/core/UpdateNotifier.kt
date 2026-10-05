@@ -28,7 +28,8 @@ object UpdateNotifier {
 
     fun notifyUpdateAvailable(context: Context, info: ReleaseInfo) {
         ensureChannel(context)
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(info.htmlUrl)).apply {
+        // Tap goes straight to the .apk asset (same target as Settings → App Updates)
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(info.downloadUrl)).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         val pi = PendingIntent.getActivity(
@@ -47,7 +48,7 @@ object UpdateNotifier {
         try {
             NotificationManagerCompat.from(context).notify(NOTIF_ID, notif)
         } catch (_: SecurityException) {
-            // POST_NOTIFICATIONS not granted — silently ignore; in-app dialog still shows
+            // POST_NOTIFICATIONS not granted — silently ignore; the result stays visible in App Updates
         }
     }
 

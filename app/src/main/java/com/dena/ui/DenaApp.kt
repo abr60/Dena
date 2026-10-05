@@ -124,8 +124,32 @@ fun DenaApp(database: DenaDatabase) {
     val prefs = remember(context) { com.dena.core.DenaPreferences(context) }
     val destinations = destinationsFor(prefs.getTerminologyMode())
     val scope = rememberCoroutineScope()
-    var pendingUpdate by remember { mutableStateOf<com.dena.core.ReleaseInfo?>(null) }
-    var showUpdateDialog by remember { mutableStateOf(false) }
+    var pendingNotifyInfo by remember { mutableStateOf<com.dena.core.ReleaseInfo?>(null) }
+    val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val info = pendingNotifyInfo
+        pendingNotifyInfo = null
+        if (granted && info != null) {
+            com.dena.core.UpdateNotifier.notifyUpdateAvailable(context, info)
+            prefs.setLastNotifiedTag(info.tagName)
+        }
+    }
+    // Delivers a found update via system notification, requesting POST_NOTIFICATIONS first on API 33+
+    LaunchedEffect(pendingNotifyInfo) {
+        val info = pendingNotifyInfo ?: return@LaunchedEffect
+        val granted = android.os.Build.VERSION.SDK_INT < 33 ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            com.dena.core.UpdateNotifier.notifyUpdateAvailable(context, info)
+            prefs.setLastNotifiedTag(info.tagName)
+            pendingNotifyInfo = null
+        } else {
+            notifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var settingsTabReselected by rememberSaveable { mutableStateOf(false) }
     var showDebtForm by rememberSaveable { mutableStateOf(false) }
@@ -186,24 +210,29 @@ fun DenaApp(database: DenaDatabase) {
         if (selectedTab < 2 && pagerState.currentPage != selectedTab) pagerState.animateScrollToPage(selectedTab, animationSpec = tween(260))
     }
 
-    // Auto-check for updates on app open (throttled 12h) — notification + in-app dialog
+    // Silent auto-check for updates on app open (throttled 12h): records the result
+    // for Settings → App Updates and notifies via system notification only — no popup.
     LaunchedEffect(Unit) {
         val now = System.currentTimeMillis()
         val last = prefs.getLastUpdateCheck()
         if (now - last < 12L * 60 * 60 * 1000) return@LaunchedEffect
-        prefs.setLastUpdateCheck(now)
         val result = com.dena.core.UpdateChecker.fetchLatest()
-        val info = result.getOrNull() ?: return@LaunchedEffect
-        val current = com.dena.BuildConfig.VERSION_NAME
-        if (!com.dena.core.UpdateChecker.isNewer(info.tagName, current)) return@LaunchedEffect
-        if (info.tagName == prefs.getDismissedUpdateTag()) return@LaunchedEffect
-        pendingUpdate = info
-        showUpdateDialog = true
-        // System notification (best-effort; silently no-ops if POST_NOTIFICATIONS denied)
-        if (info.tagName != prefs.getLastNotifiedTag()) {
-            com.dena.core.UpdateNotifier.notifyUpdateAvailable(context, info)
-            prefs.setLastNotifiedTag(info.tagName)
+        prefs.setLastUpdateCheck(now)
+        val info = result.getOrNull()
+        if (info == null) {
+            prefs.setLastUpdateStatus(com.dena.core.DenaPreferences.UPDATE_STATUS_FAILED)
+            return@LaunchedEffect
         }
+        val current = com.dena.BuildConfig.VERSION_NAME
+        if (!com.dena.core.UpdateChecker.isNewer(info.tagName, current)) {
+            prefs.setLastUpdateStatus(com.dena.core.DenaPreferences.UPDATE_STATUS_UP_TO_DATE)
+            prefs.setLastUpdateTag("")
+            return@LaunchedEffect
+        }
+        prefs.setLastUpdateStatus(com.dena.core.DenaPreferences.UPDATE_STATUS_AVAILABLE)
+        prefs.setLastUpdateTag(info.tagName)
+        if (info.tagName == prefs.getLastNotifiedTag()) return@LaunchedEffect
+        pendingNotifyInfo = info
     }
 
     // Floating action button only on main tabs (not settings)
@@ -318,17 +347,6 @@ fun DenaApp(database: DenaDatabase) {
                     .padding(innerPadding),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                // Update dialog sits above the animated content so it doesn't remount on route change
-                if (showUpdateDialog && pendingUpdate != null) {
-                    com.dena.ui.components.UpdateAvailableDialog(
-                        info = pendingUpdate!!,
-                        onDismiss = { showUpdateDialog = false },
-                        onDismissVersion = {
-                            prefs.setDismissedUpdateTag(pendingUpdate!!.tagName)
-                            showUpdateDialog = false
-                        },
-                    )
-                }
                 AnimatedContent(
                     targetState = targetRoute,
                     transitionSpec = {

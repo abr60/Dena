@@ -26,18 +26,43 @@ fun UpdateSubpage(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currentVersion = BuildConfig.VERSION_NAME
+    val prefs = remember(context) { com.dena.core.DenaPreferences(context) }
     var checking by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<ReleaseInfo?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var hasChecked by remember { mutableStateOf(false) }
+    var storedCheck by remember { mutableLongStateOf(prefs.getLastUpdateCheck()) }
+    var storedStatus by remember { mutableStateOf(prefs.getLastUpdateStatus()) }
+    var storedTag by remember { mutableStateOf(prefs.getLastUpdateTag()) }
 
     fun check() {
         checking = true
         error = null
         scope.launch {
+            val now = System.currentTimeMillis()
             UpdateChecker.fetchLatest()
-                .onSuccess { info = it; hasChecked = true }
-                .onFailure { error = it.message ?: "Failed to check"; hasChecked = true }
+                .onSuccess {
+                    info = it
+                    hasChecked = true
+                    val newer = UpdateChecker.isNewer(it.tagName, currentVersion)
+                    prefs.setLastUpdateCheck(now)
+                    prefs.setLastUpdateStatus(
+                        if (newer) com.dena.core.DenaPreferences.UPDATE_STATUS_AVAILABLE
+                        else com.dena.core.DenaPreferences.UPDATE_STATUS_UP_TO_DATE
+                    )
+                    prefs.setLastUpdateTag(if (newer) it.tagName else "")
+                    storedCheck = now
+                    storedStatus = prefs.getLastUpdateStatus()
+                    storedTag = prefs.getLastUpdateTag()
+                }
+                .onFailure {
+                    error = it.message ?: "Failed to check"
+                    hasChecked = true
+                    prefs.setLastUpdateCheck(now)
+                    prefs.setLastUpdateStatus(com.dena.core.DenaPreferences.UPDATE_STATUS_FAILED)
+                    storedCheck = now
+                    storedStatus = com.dena.core.DenaPreferences.UPDATE_STATUS_FAILED
+                }
             checking = false
         }
     }
@@ -51,6 +76,30 @@ fun UpdateSubpage(onBack: () -> Unit) {
                 Text("Installed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("v$currentVersion", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Text("Tap Check for updates to see the latest release on GitHub.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        // Last-check status (written by the silent auto-check on app open and by manual checks)
+        SettingsGroup {
+            Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Last checked", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (storedCheck == 0L) "Never"
+                    else java.text.SimpleDateFormat("MMM d, yyyy • h:mm a", java.util.Locale.US).format(java.util.Date(storedCheck)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    when (storedStatus) {
+                        com.dena.core.DenaPreferences.UPDATE_STATUS_AVAILABLE ->
+                            if (storedTag.isNotBlank()) "Update available: $storedTag" else "Update available"
+                        com.dena.core.DenaPreferences.UPDATE_STATUS_UP_TO_DATE -> "You're up to date."
+                        com.dena.core.DenaPreferences.UPDATE_STATUS_FAILED -> "Last check failed — try again."
+                        else -> "Automatic checks run when you open the app."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 

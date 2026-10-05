@@ -84,8 +84,11 @@ class DenaPreferences(context: Context) {
     fun getDarkMode(): Boolean = prefs.getBoolean(KEY_DARK_MODE, false)
     fun setDarkMode(v: Boolean) { prefs.edit().putBoolean(KEY_DARK_MODE, v).apply() }
 
-    fun getDismissedUpdateTag(): String = prefs.getString(KEY_DISMISSED_UPDATE_TAG, "") ?: ""
-    fun setDismissedUpdateTag(v: String) { prefs.edit().putString(KEY_DISMISSED_UPDATE_TAG, v).apply() }
+    fun getLastUpdateStatus(): String = prefs.getString(KEY_LAST_UPDATE_STATUS, UPDATE_STATUS_UNKNOWN) ?: UPDATE_STATUS_UNKNOWN
+    fun setLastUpdateStatus(v: String) { prefs.edit().putString(KEY_LAST_UPDATE_STATUS, v).apply() }
+
+    fun getLastUpdateTag(): String = prefs.getString(KEY_LAST_UPDATE_TAG, "") ?: ""
+    fun setLastUpdateTag(v: String) { prefs.edit().putString(KEY_LAST_UPDATE_TAG, v).apply() }
 
     fun getLastUpdateCheck(): Long = prefs.getLong(KEY_LAST_UPDATE_CHECK, 0L)
     fun setLastUpdateCheck(v: Long) { prefs.edit().putLong(KEY_LAST_UPDATE_CHECK, v).apply() }
@@ -179,7 +182,12 @@ class DenaPreferences(context: Context) {
         const val KEY_SHOW_PERCENTAGE = "show_percentage"
         const val KEY_HISTORY_CLEAN_DAYS = "history_clean_days"
         const val KEY_UNLOCKED = "unlocked"
-        const val KEY_DISMISSED_UPDATE_TAG = "dismissed_update_tag"
+        const val KEY_LAST_UPDATE_STATUS = "last_update_status"
+        const val KEY_LAST_UPDATE_TAG = "last_update_tag"
+        const val UPDATE_STATUS_UNKNOWN = "unknown"
+        const val UPDATE_STATUS_UP_TO_DATE = "up_to_date"
+        const val UPDATE_STATUS_AVAILABLE = "available"
+        const val UPDATE_STATUS_FAILED = "failed"
         const val KEY_LAST_UPDATE_CHECK = "last_update_check"
         const val KEY_LAST_NOTIFIED_TAG = "last_notified_tag"
         const val KEY_SHOW_DATE_HEADERS = "show_date_headers"

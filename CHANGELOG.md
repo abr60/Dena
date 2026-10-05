@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.2-alpha — 2026-10-05
+- **Silent update checks** — the automatic check on app open no longer pops up; the result persists and `Settings → App Updates` shows a Last-checked card (Never / date + Up to date / Update available / Check failed).
+- **Direct `.apk` updates** — both the notification tap and the subpage buttons open the release `.apk` asset directly (`UpdateAvailableDialog` removed).
+- **Notification permission** — on Android 13+, the app asks for notification permission when an update is found so the update alert can actually appear.
+
 ## v0.7.1-alpha — 2026-10-05
 - **Tags, user-editable + off by default** — relationship tagging is now a system toggle (`Settings → Tags`, default off); fully custom tag list (add up to 20, rename with bulk update, delete with usage-count confirm that untags affected debts); first enable imports values already stored on debts; legacy `other` normalizes to untagged. Tag picker on create form, `Tag:` row on detail screen, labels on list cards, filter chips on both tabs (tap to filter, re-tap to clear). New `tags_enabled` + `relationship_tags` backup keys.
 - **Backup/restore hardening (12 fixes)** — balances recomputed from the payment ledger on restore (stored values never trusted); delete-debt cascades its transactions + one-time orphan sweep; restore confirmation dialog with counts/date; `dena-backup` format + version validation (`Not a Dena backup file`); atomic export snapshot; `Last backup` set on every path; scheduled backups use dated filenames; dead schedule reset when no folder; strict folder-picker errors; `theme_mode` included in backups; dead merge-restore code removed.
