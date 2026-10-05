@@ -8,11 +8,33 @@ import android.util.Base64
 import java.nio.charset.StandardCharsets
 
 object BackupHelper {
+    const val CURRENT_BACKUP_VERSION = 2
+    const val DB_SCHEMA_VERSION = 4
+
+    /**
+     * Single rolling backup: delete every other Dena backup file in [dir] so only
+     * [keepFileName] survives. Matches dena-backup-*.json plus the legacy fixed-name
+     * dena-backup.json from older app versions. Save-as exports (user-picked
+     * locations) never call this — pruning happens only in the app's own folder.
+     */
+    fun pruneOldBackups(dir: androidx.documentfile.provider.DocumentFile, keepFileName: String) {
+        for (f in dir.listFiles()) {
+            val name = f.name ?: continue
+            if (name == keepFileName || !f.isFile) continue
+            if (name == "dena-backup.json" || (name.startsWith("dena-backup-") && name.endsWith(".json"))) {
+                try { f.delete() } catch (_: Exception) { }
+            }
+        }
+    }
+
     data class BackupData(
         val debts: List<Debt>,
         val txs: List<Transaction>,
         val templates: List<MessageTemplate>,
         val preferences: org.json.JSONObject?,
+        /** True when the file actually contained a "templates" array (v1 backups don't). */
+        val hadTemplates: Boolean = true,
+        val exportedAt: Long = 0L,
     )
 
     fun exportProfileToJson(
@@ -65,7 +87,9 @@ object BackupHelper {
         }
         val root = org.json.JSONObject().apply {
             put("format", "dena-backup")
-            put("version", 2)
+            put("version", CURRENT_BACKUP_VERSION)
+            put("appVersion", try { com.dena.BuildConfig.VERSION_NAME } catch (_: Exception) { "unknown" })
+            put("schemaVersion", DB_SCHEMA_VERSION)
             put("exportedAt", System.currentTimeMillis())
             put("debts", debtsArr)
             put("transactions", txsArr)
@@ -87,6 +111,7 @@ object BackupHelper {
             put("show_contact_number", p.showContactNumber())
             put("show_manual_phone_field", p.showManualPhoneField())
             put("terminology_mode", p.getTerminologyMode())
+            put("theme_mode", p.getThemeMode().name)
             put("follow_system_theme", p.isFollowSystemTheme())
             put("dark_mode", p.getDarkMode())
             put("dynamic_colors_enabled", p.isDynamicColorsEnabled())
@@ -100,10 +125,12 @@ object BackupHelper {
             put("backup_schedule", p.getBackupSchedule())
             put("onboarding_done", p.isOnboardingDone())
             put("unlocked", p.isUnlocked())
+            put("tags_enabled", p.relationshipTagsEnabled())
+            put("relationship_tags", org.json.JSONArray(p.getRelationshipTags()).toString())
         }
     }
 
-    fun applyPreferences(context: Context, prefsJson: org.json.JSONObject) {
+    fun applyPreferences(context: Context, prefsJson: org.json.JSONObject, hadTemplates: Boolean = true) {
         val p = DenaPreferences(context)
         if (prefsJson.has("language")) p.setLanguage(prefsJson.optString("language", DenaPreferences.LANG_EN))
         if (prefsJson.has("currency")) p.setCurrency(prefsJson.optString("currency", DenaPreferences.CURRENCY_BDT))
@@ -113,6 +140,7 @@ object BackupHelper {
         if (prefsJson.has("show_contact_number")) p.setShowContactNumber(prefsJson.optBoolean("show_contact_number", false))
         if (prefsJson.has("show_manual_phone_field")) p.setShowManualPhoneField(prefsJson.optBoolean("show_manual_phone_field", false))
         if (prefsJson.has("terminology_mode")) p.setTerminologyMode(prefsJson.optString("terminology_mode", DenaPreferences.TERM_LENT_BORROWED))
+        if (prefsJson.has("theme_mode")) p.setThemeModeName(prefsJson.optString("theme_mode", "SYSTEM"))
         if (prefsJson.has("follow_system_theme")) p.setFollowSystemTheme(prefsJson.optBoolean("follow_system_theme", true))
         if (prefsJson.has("dark_mode")) p.setDarkMode(prefsJson.optBoolean("dark_mode", false))
         if (prefsJson.has("dynamic_colors_enabled")) p.setDynamicColorsEnabled(prefsJson.optBoolean("dynamic_colors_enabled", false))
@@ -126,8 +154,17 @@ object BackupHelper {
         if (prefsJson.has("backup_schedule")) p.setBackupSchedule(prefsJson.optString("backup_schedule", DenaPreferences.SCHEDULE_DISABLED))
         if (prefsJson.has("onboarding_done")) p.setOnboardingDone(prefsJson.optBoolean("onboarding_done", false))
         if (prefsJson.has("unlocked")) p.setUnlocked(prefsJson.optBoolean("unlocked", false))
-        // mark templates as seeded so an empty-template backup doesn't silently re-seed defaults
-        p.setTemplatesSeeded(true)
+        if (prefsJson.has("tags_enabled")) p.setRelationshipTagsEnabled(prefsJson.optBoolean("tags_enabled", false))
+        if (prefsJson.has("relationship_tags")) {
+            try {
+                val arr = org.json.JSONArray(prefsJson.optString("relationship_tags", "[]"))
+                p.setRelationshipTags((0 until arr.length()).map { arr.optString(it, "") })
+            } catch (_: Exception) { /* keep current tags */ }
+        }
+        // Mark templates seeded only when the file actually carried a templates
+        // array (P4): a v1 backup has none, and must NOT suppress the first-run
+        // seeding of the built-in templates.
+        if (hadTemplates) p.setTemplatesSeeded(true)
     }
 
     fun decodeBackupString(input: String): String? {
@@ -141,7 +178,21 @@ object BackupHelper {
         } catch (_: Exception) { null }
     }
 
+    /**
+     * Returns null when the string is a usable Dena backup, otherwise a short
+     * machine-readable reason: "not_json" | "not_dena_backup" |
+     * "unsupported_version:<n>". Callers map these to user-facing messages.
+     */
+    fun parseError(jsonStr: String): String? {
+        val json = try { org.json.JSONObject(jsonStr) } catch (_: Exception) { return "not_json" }
+        if (json.optString("format") != "dena-backup") return "not_dena_backup"
+        val v = json.optInt("version", -1)
+        if (v < 1 || v > CURRENT_BACKUP_VERSION) return "unsupported_version:$v"
+        return null
+    }
+
     fun parseBackup(jsonStr: String): BackupData? {
+        if (parseError(jsonStr) != null) return null
         return try {
             val json = org.json.JSONObject(jsonStr)
             val debtsArr = json.optJSONArray("debts") ?: org.json.JSONArray()
@@ -202,15 +253,10 @@ object BackupHelper {
                     )
                 }
             }
-            BackupData(debts, txs, templates, prefsObj)
+            BackupData(debts, txs, templates, prefsObj, hadTemplates = json.has("templates"), exportedAt = json.optLong("exportedAt", 0L))
         } catch (e: Exception) {
             e.printStackTrace(); null
         }
     }
 
-    /** Legacy compat: delegate to parseBackup. */
-    fun importProfileFromString(jsonStr: String, onDebts: (List<Debt>) -> Unit, onTxs: (List<Transaction>) -> Unit): Boolean {
-        val data = parseBackup(jsonStr) ?: return false
-        onDebts(data.debts); onTxs(data.txs); return true
-    }
 }

@@ -26,8 +26,13 @@ class BackupWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
             val json = BackupHelper.exportProfileToJson(debts, txs, templates, prefsSnap)
             val treeUri = android.net.Uri.parse(dirUri)
             val dir = DocumentFile.fromTreeUri(ctx, treeUri) ?: return Result.failure()
-            var file = dir.findFile("dena-backup.json")
-            if (file == null) file = dir.createFile("application/json", "dena-backup.json")
+            // Single rolling backup: one dated file, previous ones pruned (incl.
+            // the legacy fixed-name file from older app versions).
+            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+            val fileName = "dena-backup-$today.json"
+            BackupHelper.pruneOldBackups(dir, fileName)
+            dir.findFile(fileName)?.delete()
+            val file = dir.createFile("application/json", fileName)
             if (file == null) return Result.failure()
             ctx.contentResolver.openOutputStream(file.uri, "w")?.use { it.write(json.toByteArray()) }
             prefs.setLastBackupTime(System.currentTimeMillis())

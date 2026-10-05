@@ -125,6 +125,7 @@ fun DebtList(
     val showPercentage = prefs.showPercentage()
     val showDecimals = prefs.showDecimals()
     val showContactNumber = prefs.showContactNumber()
+    val tagsEnabled = prefs.relationshipTagsEnabled()
     val dateFmt = SimpleDateFormat("M/d/yy", Locale.US)
 
     val filtered = remember(debts, searchQuery, relationshipFilter) {
@@ -177,6 +178,7 @@ fun DebtList(
                     showPercentage = showPercentage,
                     showDecimals = showDecimals,
                     showContactNumber = showContactNumber,
+                    tagsEnabled = tagsEnabled,
                     dateFmt = dateFmt,
                 )
             }
@@ -193,6 +195,7 @@ private fun DebtCardItem(
     showPercentage: Boolean,
     showDecimals: Boolean,
     showContactNumber: Boolean,
+    tagsEnabled: Boolean,
     dateFmt: SimpleDateFormat,
 ) {
     val isIOwe = debt.direction == "i_owe"
@@ -243,7 +246,7 @@ private fun DebtCardItem(
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                     )
-                    if (debt.relationship != "other") {
+                    if (tagsEnabled && Debt.labelForRelationship(debt.relationship).isNotBlank()) {
                         Text(
                             text = Debt.labelForRelationship(debt.relationship),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),

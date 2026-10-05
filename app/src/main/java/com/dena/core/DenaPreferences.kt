@@ -31,6 +31,14 @@ class DenaPreferences(context: Context) {
         } catch (e: Exception) { com.dena.ui.theme.DenaThemeMode.SYSTEM }
     }
     fun setThemeMode(mode: com.dena.ui.theme.DenaThemeMode) { prefs.edit().putString(KEY_THEME_MODE, mode.name).apply() }
+    /** String-safe setter for the backup/restore layer (avoids ui imports there). */
+    fun setThemeModeName(name: String) {
+        try { setThemeMode(com.dena.ui.theme.DenaThemeMode.valueOf(name)) }
+        catch (_: Exception) { /* unknown mode from another version — keep current */ }
+    }
+
+    fun isOrphanSweepDone(): Boolean = prefs.getBoolean(KEY_ORPHAN_SWEEP_DONE, false)
+    fun setOrphanSweepDone(v: Boolean) { prefs.edit().putBoolean(KEY_ORPHAN_SWEEP_DONE, v).apply() }
 
     fun getFontScale(): Float {
         if (prefs.contains(KEY_FONT_SCALE)) return prefs.getFloat(KEY_FONT_SCALE, 1f)
@@ -123,6 +131,33 @@ class DenaPreferences(context: Context) {
     fun getLastBackupTime(): Long = prefs.getLong(KEY_LAST_BACKUP_TIME, 0L)
     fun setLastBackupTime(v: Long) { prefs.edit().putLong(KEY_LAST_BACKUP_TIME, v).apply() }
 
+    // Relationship tags: whole-system toggle (default OFF) + user-editable tag list
+    fun relationshipTagsEnabled(): Boolean = prefs.getBoolean(KEY_TAGS_ENABLED, false)
+    fun setRelationshipTagsEnabled(v: Boolean) { prefs.edit().putBoolean(KEY_TAGS_ENABLED, v).apply() }
+
+    fun getRelationshipTags(): List<String> {
+        val raw = prefs.getString(KEY_RELATIONSHIP_TAGS, "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return try {
+            val arr = org.json.JSONArray(raw)
+            val out = LinkedHashSet<String>()
+            for (i in 0 until arr.length()) {
+                val t = arr.optString(i, "").trim()
+                if (t.isNotBlank()) out.add(t)
+            }
+            out.toList()
+        } catch (_: Exception) { emptyList() }
+    }
+    fun setRelationshipTags(tags: List<String>) {
+        val arr = org.json.JSONArray()
+        val seen = LinkedHashSet<String>()
+        tags.forEach {
+            val t = it.trim()
+            if (t.isNotBlank() && seen.add(t)) arr.put(t)
+        }
+        prefs.edit().putString(KEY_RELATIONSHIP_TAGS, arr.toString()).apply()
+    }
+
     companion object {
         const val PREFS_NAME = "dena_preferences"
         const val KEY_THEME_MODE = "theme_mode"
@@ -172,5 +207,8 @@ class DenaPreferences(context: Context) {
         const val SCHEDULE_MONTHLY = "monthly"
         const val KEY_TEMPLATES_SEEDED = "templates_seeded"
         const val KEY_LAST_BACKUP_TIME = "last_backup_time"
+        const val KEY_ORPHAN_SWEEP_DONE = "orphan_sweep_done_v1"
+        const val KEY_TAGS_ENABLED = "tags_enabled"
+        const val KEY_RELATIONSHIP_TAGS = "relationship_tags"
     }
 }

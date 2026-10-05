@@ -55,6 +55,10 @@ fun IOweScreen(
     val symbol = prefs.getCurrencySymbol()
     val showDateHeaders = prefs.showDateHeaders()
     val labels = com.dena.core.Terminology.labels(prefs.getTerminologyMode())
+    // Tags are user-defined (Settings → Tags); read fresh so edits apply on return.
+    val tagsEnabled = prefs.relationshipTagsEnabled()
+    val tags = prefs.getRelationshipTags()
+    val effectiveFilter = if (tagsEnabled && relationshipFilter in tags) relationshipFilter else null
 
     ScreenContainer(
         title = labels.tabBorrowed,
@@ -79,21 +83,18 @@ fun IOweScreen(
                 EmptyState(message = "You don't owe anyone yet. Tap + to add a debt.")
             } else {
                 androidx.compose.foundation.layout.Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        FilterChip(
-                            selected = relationshipFilter == null,
-                            onClick = { relationshipFilter = null },
-                            label = { Text("All") },
-                        )
-                        Debt.RELATIONSHIPS.forEach { rel ->
-                            FilterChip(
-                                selected = relationshipFilter == rel,
-                                onClick = { relationshipFilter = rel },
-                                label = { Text(Debt.labelForRelationship(rel)) },
-                            )
+                    if (tagsEnabled && tags.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            tags.forEach { tag ->
+                                FilterChip(
+                                    selected = relationshipFilter == tag,
+                                    onClick = { relationshipFilter = if (relationshipFilter == tag) null else tag },
+                                    label = { Text(Debt.labelForRelationship(tag)) },
+                                )
+                            }
                         }
                     }
                     Row(
@@ -103,7 +104,7 @@ fun IOweScreen(
                         SortMenuButton(sort = sort, onSortChange = { sort = it })
                     }
                     if (openDebts.isNotEmpty()) {
-                        DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort, showDateHeaders = showDateHeaders, listState = listState, relationshipFilter = relationshipFilter)
+                        DebtList(debts = openDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, sort = sort, showDateHeaders = showDateHeaders, listState = listState, relationshipFilter = effectiveFilter)
                     }
                     AnimatedVisibility(
                         visible = closedDebts.isNotEmpty(),
@@ -117,7 +118,7 @@ fun IOweScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
                             )
-                            DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort, showDateHeaders = showDateHeaders, listState = listState, relationshipFilter = relationshipFilter)
+                            DebtList(debts = closedDebts, onDebtClick = onDebtClick, searchQuery = searchQuery, closed = true, sort = sort, showDateHeaders = showDateHeaders, listState = listState, relationshipFilter = effectiveFilter)
                         }
                     }
                 }

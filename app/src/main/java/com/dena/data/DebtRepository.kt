@@ -1,6 +1,7 @@
 package com.dena.data
 
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import com.dena.data.debt.Debt
 import com.dena.data.debt.DebtDao
 import com.dena.data.transaction.Transaction
@@ -24,7 +25,12 @@ class DebtRepository(
     // Debt CRUD
     suspend fun insertDebt(debt: Debt): Long = debtDao.insert(debt)
     suspend fun updateDebt(debt: Debt) = debtDao.update(debt)
-    suspend fun deleteDebt(debt: Debt) = debtDao.delete(debt)
+    suspend fun deleteDebt(debt: Debt) = database.withTransaction {
+        // Cascade: deleting a debt must not leave orphan transactions behind
+        // (orphans ride into backups and are silently dropped on restore).
+        transactionDao.deleteByDebtId(debt.id)
+        debtDao.delete(debt)
+    }
 
     // Transaction operations
     suspend fun insertTransaction(tx: Transaction): Long = transactionDao.insert(tx)
@@ -43,7 +49,7 @@ class DebtRepository(
     suspend fun ensureInitialTransactions() = withContext(Dispatchers.IO) {
         val debts = debtDao.getAllOnce()
         for (debt in debts) {
-            val count = transactionDao.countInitialTransactions(debt.id, debt.creationDate)
+            val count = transactionDao.countInitialTransactions(debt.id)
             if (count == 0) {
                 val initialTx = Transaction.create(
                     debtId = debt.id,
@@ -53,6 +59,7 @@ class DebtRepository(
                     timestamp = debt.creationDate
                 )
                 transactionDao.insert(initialTx)
+                recalculateDebtBalance(debt.id)
             }
         }
     }

@@ -22,8 +22,8 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE debtId = :debtId")
     suspend fun getAllForDebtOnce(debtId: Long): List<Transaction>
 
-    @Query("SELECT COUNT(*) FROM transactions WHERE debtId = :debtId AND timestamp = :timestamp AND direction = 'debt_added'")
-    suspend fun countInitialTransactions(debtId: Long, timestamp: Long): Int
+    @Query("SELECT COUNT(*) FROM transactions WHERE debtId = :debtId AND direction = 'debt_added'")
+    suspend fun countInitialTransactions(debtId: Long): Int
 
     @Query("SELECT * FROM transactions WHERE debtId = :debtId ORDER BY timestamp DESC")
     fun getByDebtId(debtId: Long): Flow<List<Transaction>>
@@ -36,4 +36,11 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM transactions WHERE debtId = :debtId")
+    suspend fun deleteByDebtId(debtId: Long)
+
+    /** Deletes transactions with no matching debt row. Returns rows removed. */
+    @Query("DELETE FROM transactions WHERE debtId NOT IN (SELECT id FROM debts)")
+    suspend fun deleteOrphans(): Int
 }

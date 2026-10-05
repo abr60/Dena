@@ -8,6 +8,8 @@ import android.provider.ContactsContract
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,7 +86,7 @@ fun DebtFormScreen(
     var phone by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
     var isOwedToMe by remember { mutableStateOf(initialIsOwedToMe ?: true) }
-    var relationship by remember { mutableStateOf("other") }
+    var relationship by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var noDueDate by remember { mutableStateOf(true) }
     var creationDate by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -92,6 +95,9 @@ fun DebtFormScreen(
     val prefs = remember(context) { DenaPreferences(context) }
     var currencyCode by remember { mutableStateOf(prefs.getCurrency()) }
     val showPhoneField = prefs.showManualPhoneField()
+    // Relationship tags: whole-system toggle (Settings → Tags, default off)
+    val tagsEnabled = prefs.relationshipTagsEnabled()
+    val tags = prefs.getRelationshipTags()
     // existing contacts for suggestions — carry phone for auto-fill (Task 2)
     val owedList by viewModel.owedToMe.collectAsStateWithLifecycle()
     val iOweList by viewModel.iOwe.collectAsStateWithLifecycle()
@@ -312,8 +318,10 @@ fun DebtFormScreen(
                 }
             }
 
-            // Relationship tag selector (Task 5)
-            RelationshipSelector(selected = relationship, onSelect = { relationship = it })
+            // Relationship tag selector — only when tags are enabled and tags exist
+            if (tagsEnabled && tags.isNotEmpty()) {
+                RelationshipSelector(tags = tags, selected = relationship, onSelect = { relationship = it })
+            }
 
             // Phone (optional) — hidden when toggle off (Task 3)
             if (showPhoneField) {
@@ -449,7 +457,7 @@ fun DebtFormScreen(
                     dueDate = if (noDueDate) null else dueDate,
                     creationDate = creationDate,
                     contactPhone = phone.trim().takeIf { it.isNotBlank() },
-                    relationship = relationship,
+                    relationship = if (tagsEnabled) relationship else "",
                 )
                 onBack()
             },
@@ -490,24 +498,27 @@ fun DebtFormScreen(
 
 @Composable
 private fun RelationshipSelector(
+    tags: List<String>,
     selected: String,
     onSelect: (String) -> Unit,
 ) {
+    // User-defined list can hold up to 20 tags — scroll instead of squeezing.
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Debt.RELATIONSHIPS.forEach { key ->
+        tags.forEach { key ->
             val isSel = selected == key
             Box(
-                modifier = Modifier.weight(1f).height(34.dp)
+                modifier = Modifier.height(34.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
                     .border(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                    .clickable { onSelect(key) },
+                    .clickable { onSelect(if (isSel) "" else key) }
+                    .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(Debt.labelForRelationship(key), style = MaterialTheme.typography.labelSmall, fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal, color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(Debt.labelForRelationship(key).ifBlank { key }, style = MaterialTheme.typography.labelSmall, fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal, color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
             }
         }
     }

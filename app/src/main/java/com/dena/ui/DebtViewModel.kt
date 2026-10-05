@@ -71,7 +71,7 @@ class DebtViewModel(
         dateOpened: Long = System.currentTimeMillis(),
         creationDate: Long = System.currentTimeMillis(),
         contactPhone: String? = null,
-        relationship: String = "other",
+        relationship: String = "",
     ) {
         viewModelScope.launch {
             val debt = Debt.fromDomain(
@@ -137,8 +137,9 @@ class DebtViewModel(
     }
 
     fun updateRelationship(debt: Debt, newRelationship: String) {
-        val normalized = newRelationship.lowercase(java.util.Locale.US)
-        if (normalized == debt.relationship || normalized !in Debt.RELATIONSHIPS) return
+        // Tags are fully user-defined: accept any key (blank clears the tag).
+        val normalized = Debt.normalizeTag(newRelationship)
+        if (normalized == Debt.normalizeTag(debt.relationship)) return
         viewModelScope.launch {
             repository.updateDebt(debt.copy(relationship = normalized, updatedAt = System.currentTimeMillis()))
         }
@@ -163,11 +164,5 @@ class DebtViewModel(
         viewModelScope.launch {
             repository.addMoreDebt(debtId, amount, note, timestamp)
         }
-    }
-
-    suspend fun importDebtsAndTxs(debts: List<Debt>, txs: List<Transaction>) {
-        for (d in debts) repository.insertDebt(d.copy(id = 0))
-        // naive: re-insert txs after debts; real ids will shift but okay for backup restore
-        for (t in txs) repository.insertTransaction(t.copy(id = 0))
     }
 }

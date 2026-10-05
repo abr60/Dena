@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.1-alpha — 2026-10-05
+- **Tags, user-editable + off by default** — relationship tagging is now a system toggle (`Settings → Tags`, default off); fully custom tag list (add up to 20, rename with bulk update, delete with usage-count confirm that untags affected debts); first enable imports values already stored on debts; legacy `other` normalizes to untagged. Tag picker on create form, `Tag:` row on detail screen, labels on list cards, filter chips on both tabs (tap to filter, re-tap to clear). New `tags_enabled` + `relationship_tags` backup keys.
+- **Backup/restore hardening (12 fixes)** — balances recomputed from the payment ledger on restore (stored values never trusted); delete-debt cascades its transactions + one-time orphan sweep; restore confirmation dialog with counts/date; `dena-backup` format + version validation (`Not a Dena backup file`); atomic export snapshot; `Last backup` set on every path; scheduled backups use dated filenames; dead schedule reset when no folder; strict folder-picker errors; `theme_mode` included in backups; dead merge-restore code removed.
+- **One rolling backup** — `Back up` updates today's `dena-backup-YYYY-MM-DD.json` in place and prunes older files, so the backup folder holds exactly one file.
+- **Fix** — `ensureInitialTransactions` backfill could insert phantom `debt_added` rows for legacy debts (guard matched timestamp exactly + no recalc); now idempotent (counts all `debt_added`) with recalc after insert.
+- **Fix** — scheduled/manual rewrites of an existing backup file left a stale tail (corrupt JSON); both paths now delete-before-recreate.
+- **UI** — "Initial Amount" label on PDF statements; Debt Detail history colors (Log Payment green `+`, Lend/Borrow More red `−`); summary Remaining colored by direction; in-app update checker (auto-check on open, 12h throttle) + `Settings → App Updates`.
+
 ## v0.7.0-alpha — 2026-09-25
 - **Relationship tagging** — DB v4 `Debt.relationship` (`family`/`friend`/`colleague`/`business`/`other`); chip selector on create form, spinner on detail screen, filter chips on I Lent / I Borrowed lists (`MIGRATION_3_4`).
 - **Message templates** — new `message_templates` table (DB v4) with 3 seeded defaults; CRUD in `Settings → Templates` (bottom-sheet editor); `{name}`/`{amount}`/`{date}` placeholders via `TemplateEngine`.

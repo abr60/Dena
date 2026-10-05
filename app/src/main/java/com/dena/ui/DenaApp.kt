@@ -162,6 +162,7 @@ fun DenaApp(database: DenaDatabase) {
     LaunchedEffect(Unit) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try { com.dena.core.ContactPhoneMigrator.migrateIfNeeded(context, database.debtDao()) } catch (_: Exception) {}
+            try { com.dena.core.OrphanTransactionSweeper.sweepOnce(context, database) } catch (_: Exception) {}
             try {
                 val prefsInner = com.dena.core.DenaPreferences(context)
                 if (!prefsInner.isTemplatesSeeded() && database.templateDao().count() == 0) {

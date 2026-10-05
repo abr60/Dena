@@ -181,10 +181,11 @@ fun DebtDetailScreen(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                 ) {
                     val settled = debt.principalAmount - debt.remainingBalance
+                    val moneyPalette = LocalMoneyPalette.current
                     Text(
                         text = "Remaining: ${formatSigned(debt.remainingBalance, sym, negative = !isOwedToMe, showDecimals = showDecimals)}",
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = if (isOwedToMe) moneyPalette.positive else moneyPalette.negative,
                     )
                     if (debt.isClosed) {
                         Text(
@@ -226,27 +227,36 @@ fun DebtDetailScreen(
                             color = if (!debt.contactPhone.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                         )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("Relationship:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        androidx.compose.material3.AssistChip(
-                            onClick = { /* cycle? use dialog */ },
-                            label = { Text(com.dena.data.debt.Debt.labelForRelationship(debt.relationship)) },
-                            trailingIcon = {
-                                var expanded by remember { mutableStateOf(false) }
-                                Box {
-                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.clickable { expanded = true })
-                                    androidx.compose.material3.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                                        com.dena.data.debt.Debt.RELATIONSHIPS.forEach { key ->
-                                            androidx.compose.material3.DropdownMenuItem(text = { Text(com.dena.data.debt.Debt.labelForRelationship(key)) }, onClick = { expanded = false; viewModel.updateRelationship(debt, key) })
+                    // Tag row — only when tags are enabled (Settings → Tags, default off)
+                    if (prefs.relationshipTagsEnabled()) {
+                        val tags = prefs.getRelationshipTags()
+                        val currentLabel = com.dena.data.debt.Debt.labelForRelationship(debt.relationship).ifBlank { "None" }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text("Tag:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (tags.isEmpty()) {
+                                Text("Add tags in Settings → Tags", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            } else {
+                                androidx.compose.material3.AssistChip(
+                                    onClick = { /* opens via trailing icon */ },
+                                    label = { Text(currentLabel) },
+                                    trailingIcon = {
+                                        var expanded by remember { mutableStateOf(false) }
+                                        Box {
+                                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.clickable { expanded = true })
+                                            androidx.compose.material3.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                                tags.forEach { key ->
+                                                    androidx.compose.material3.DropdownMenuItem(text = { Text(com.dena.data.debt.Debt.labelForRelationship(key).ifBlank { key }) }, onClick = { expanded = false; viewModel.updateRelationship(debt, key) })
+                                                }
+                                            }
                                         }
                                     }
-                                }
+                                )
                             }
-                        )
+                        }
                     }
                     if (debt.notes.isNotBlank()) {
                         Text(
@@ -682,7 +692,7 @@ private fun TransactionRow(
     val context = LocalContext.current
     val prefs = remember(context) { DenaPreferences(context) }
     val currencySymbol = prefs.getCurrencySymbol()
-    val isDebtAdded = transaction.direction == "debt_added"
+    val isPayment = transaction.direction != "debt_added"
     val label = when (transaction.direction) {
         "debt_added" -> "Debt added"
         "payment_received" -> "Payment received"
@@ -723,9 +733,9 @@ private fun TransactionRow(
             Column(horizontalAlignment = Alignment.End) {
                 val raw = formatCurrencyRaw(transaction.amount, currencySymbol, showDecimals)
                 val moneyPalette = LocalMoneyPalette.current
-                val amountColor = if (isDebtAdded) moneyPalette.positive else moneyPalette.negative
+                val amountColor = if (isPayment) moneyPalette.positive else moneyPalette.negative
                 Text(
-                    text = if (isDebtAdded) "+ $raw" else "− $raw",
+                    text = if (isPayment) "+ $raw" else "− $raw",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = amountColor,

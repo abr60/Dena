@@ -36,4 +36,13 @@ interface DebtDao {
 
     @Query("DELETE FROM debts")
     suspend fun deleteAll()
+
+    @Query("UPDATE debts SET relationship = :newValue WHERE relationship = :oldValue")
+    suspend fun updateRelationshipForAll(oldValue: String, newValue: String): Int
+
+    @Query("SELECT COUNT(*) FROM debts WHERE relationship = :tag")
+    suspend fun countByRelationship(tag: String): Int
+
+    @Query("SELECT DISTINCT relationship FROM debts")
+    suspend fun getDistinctRelationships(): List<String>
 }

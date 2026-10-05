@@ -177,7 +177,7 @@ object StatementExport {
                 canvas.drawText(ellipsize(phoneStr, colW - padLeft - 8f, valuePaint), cardLeft + padLeft, r0ValueY, valuePaint)
                 canvas.drawText("Opened Date", cardLeft + colW + padLeft, r0LabelY, labelPaint)
                 canvas.drawText(openedStr, cardLeft + colW + padLeft, r0ValueY, valuePaint)
-                canvas.drawText("Original Amount", cardLeft + 2 * colW + padLeft, r0LabelY, labelPaint)
+                canvas.drawText("Initial Amount", cardLeft + 2 * colW + padLeft, r0LabelY, labelPaint)
                 canvas.drawText(originalStr, cardLeft + 2 * colW + padLeft, r0ValueY, valuePaint)
 
                 val r1LabelY = cardTop + 52f

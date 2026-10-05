@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dena.BuildConfig
 import com.dena.core.*
 import com.dena.data.DenaDatabase
+import com.dena.data.debt.Debt
 import com.dena.ui.components.CurrencyPickerDialog
 import com.dena.ui.components.DenaSelect
 import com.dena.ui.components.LanguagePickerDialog
@@ -127,6 +128,7 @@ fun SettingsScreen(
             ) { subpage = null }
             "userinterface" -> UserPreferencesSubpage(database, onBack = { subpage = null })
             "templates" -> TemplateSubpage(database = database, onBack = { subpage = null })
+            "tags" -> TagsSubpage(database = database, onBack = { subpage = null })
             "backup" -> BackupSubpage(database = database, onBack = { subpage = null })
             "update" -> UpdateSubpage(onBack = { subpage = null })
             "about" -> AboutSubpage(onBack = { subpage = null })
@@ -165,6 +167,7 @@ fun SettingsScreen(
 
                 SettingsGroup {
                     NavRow(label = "Message Templates", icon = Icons.Filled.Message, caption = "Custom reminder messages", onClick = { subpage = "templates" }, showDivider = true)
+                    NavRow(label = "Tags", icon = Icons.Filled.Label, caption = "Custom labels like friend, shop, uni", onClick = { subpage = "tags" }, showDivider = true)
                     NavRow(label = "Data and storage", icon = Icons.Filled.Storage, caption = "Backup, restore & data management", onClick = { subpage = "backup" }, showDivider = true)
                     NavRow(label = "Recent Activity", icon = Icons.AutoMirrored.Filled.List, caption = "All transactions & retention", onClick = { subpage = "activity" }, showDivider = true)
                 }
@@ -654,6 +657,173 @@ fun TemplateSubpage(database: DenaDatabase?, onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TagsSubpage(database: DenaDatabase?, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { DenaPreferences(context) }
+    var tagsEnabled by remember { mutableStateOf(prefs.relationshipTagsEnabled()) }
+    var tags by remember { mutableStateOf(prefs.getRelationshipTags()) }
+    var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var showAdd by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<String?>(null) }
+    var pendingDelete by remember { mutableStateOf<String?>(null) }
+
+    fun refreshCounts() {
+        scope.launch(Dispatchers.IO) {
+            val dao = database?.debtDao() ?: return@launch
+            val map = dao.getAllOnce().groupingBy { Debt.normalizeTag(it.relationship) }.eachCount()
+            withContext(Dispatchers.Main) { counts = map }
+        }
+    }
+    LaunchedEffect(Unit) { refreshCounts() }
+
+    SettingsSubpageScaffold(title = "Tags", onBack = onBack) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SettingsGroup {
+                ToggleRow(
+                    label = "Enable tags",
+                    caption = "Show tag picker, labels & filters across the app (off by default)",
+                    checked = tagsEnabled,
+                    onCheckedChange = { on ->
+                        tagsEnabled = on
+                        prefs.setRelationshipTagsEnabled(on)
+                        if (!on) return@ToggleRow
+                        scope.launch(Dispatchers.IO) {
+                            val dao = database?.debtDao() ?: return@launch
+                            // Legacy 'other' was a built-in tag that no longer exists:
+                            // normalize it to untagged so no debt carries a hidden value.
+                            dao.updateRelationshipForAll("other", "")
+                            if (tags.isEmpty()) {
+                                // First enable: import tag values already stored on debts
+                                val existing = dao.getDistinctRelationships()
+                                    .map { Debt.normalizeTag(it) }
+                                    .filter { it.isNotBlank() && it != "other" }
+                                    .distinct()
+                                if (existing.isNotEmpty()) {
+                                    prefs.setRelationshipTags(existing)
+                                    withContext(Dispatchers.Main) { tags = existing }
+                                }
+                            }
+                            refreshCounts()
+                        }
+                    },
+                    showDivider = false,
+                )
+            }
+            if (!tagsEnabled) {
+                Text("Tags are off. Turn them on to label debts with your own tags like friend, shop or uni.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Button(onClick = { showAdd = true }, enabled = tags.size < 20, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Text("Add Tag") }
+                if (tags.size >= 20) Text("Maximum 20 tags.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                tags.forEach { tag ->
+                    val n = counts[tag] ?: 0
+                    val label = Debt.labelForRelationship(tag).ifBlank { tag }
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                Text(if (n == 0) "Unused" else "$n debt${if (n == 1) "" else "s"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { editing = tag }) { Icon(Icons.Filled.Edit, contentDescription = "Rename") }
+                            IconButton(onClick = { pendingDelete = tag }) { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+                if (tags.isEmpty()) Text("No tags yet — add friend, shop, uni…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+    if (showAdd || editing != null) {
+        val isEdit = editing != null
+        var name by remember(editing) { mutableStateOf(editing ?: "") }
+        val norm = Debt.normalizeTag(name)
+        val clash = norm.isNotBlank() && norm in tags && norm != editing
+        val tooLong = name.trim().length > 24
+        val canSave = norm.isNotBlank() && !clash && !tooLong && (!isEdit && tags.size < 20 || isEdit)
+        ModalBottomSheet(
+            onDismissRequest = { showAdd = false; editing = null },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(if (isEdit) "Rename Tag" else "New Tag", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Tag name") },
+                    placeholder = { Text("e.g. shop") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    isError = clash || tooLong,
+                    supportingText = {
+                        when {
+                            clash -> Text("This tag already exists")
+                            tooLong -> Text("Keep it under 24 characters")
+                        }
+                    },
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = { showAdd = false; editing = null }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Cancel") }
+                    Button(
+                        onClick = {
+                            if (!canSave) return@Button
+                            val old = editing
+                            scope.launch(Dispatchers.IO) {
+                                if (old != null) {
+                                    database?.debtDao()?.updateRelationshipForAll(old, norm)
+                                    val updated = tags.map { if (it == old) norm else it }
+                                    prefs.setRelationshipTags(updated)
+                                    withContext(Dispatchers.Main) { tags = updated }
+                                } else {
+                                    val updated = tags + norm
+                                    prefs.setRelationshipTags(updated)
+                                    withContext(Dispatchers.Main) { tags = updated }
+                                }
+                                refreshCounts()
+                            }
+                            showAdd = false; editing = null
+                        },
+                        enabled = canSave,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                }
+            }
+        }
+    }
+    pendingDelete?.let { tag ->
+        val n = counts[tag] ?: 0
+        val label = Debt.labelForRelationship(tag).ifBlank { tag }
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete tag?") },
+            text = {
+                Text(
+                    if (n > 0) "\"$label\" is on $n debt${if (n == 1) "" else "s"}. Deleting removes it from all of them."
+                    else "\"$label\" is not used by any debt."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        if (n > 0) database?.debtDao()?.updateRelationshipForAll(tag, "")
+                        val updated = tags.filter { it != tag }
+                        prefs.setRelationshipTags(updated)
+                        withContext(Dispatchers.Main) { tags = updated; pendingDelete = null }
+                        refreshCounts()
+                    }
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel") } },
+        )
+    }
+}
+
 @Composable
 fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -664,7 +834,14 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
     val contentResolver = context.contentResolver
     val dirPicker = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) } catch (_: Exception) {}
+            // P10: a failed persist means scheduled + folder backups silently die later —
+            // fail loudly here instead of persisting an unusable URI.
+            try {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            } catch (_: Exception) {
+                Toast.makeText(context, "No permission for that folder — pick again", Toast.LENGTH_LONG).show()
+                return@rememberLauncherForActivityResult
+            }
             prefs.setBackupDirUri(uri.toString()); backupDirUri = uri.toString()
             Toast.makeText(context, "Backup folder set", Toast.LENGTH_SHORT).show()
         }
@@ -673,12 +850,20 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
                 try {
-                    val debts = database?.debtDao()?.getAllOnce() ?: emptyList()
-                    val txs = database?.transactionDao()?.getAllOnce() ?: emptyList()
-                    val templates = try { database?.templateDao()?.getAllOnce() ?: emptyList() } catch (_: Exception) { emptyList() }
+                    // P7: single read transaction — debts/txs/templates must be a
+                    // self-consistent snapshot, never a torn one.
+                    val db = database
+                    val (debts, txs, templates) = if (db != null) db.withTransaction {
+                        Triple(
+                            db.debtDao().getAllOnce(),
+                            db.transactionDao().getAllOnce(),
+                            try { db.templateDao().getAllOnce() } catch (_: Exception) { emptyList() },
+                        )
+                    } else Triple(emptyList(), emptyList(), emptyList())
                     val prefsSnap = BackupHelper.capturePreferences(context)
                     val json = BackupHelper.exportProfileToJson(debts, txs, templates, prefsSnap)
                     contentResolver.openOutputStream(uri)?.use { out -> out.write(json.toByteArray()) }
+                    prefs.setLastBackupTime(System.currentTimeMillis())
                     val filename = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.json"
                     withContext(Dispatchers.Main) { Toast.makeText(context, "Backup saved as $filename", Toast.LENGTH_LONG).show() }
                 } catch (e: Exception) {
@@ -687,6 +872,78 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
             }
         }
     }
+    // P6: restore is two-step — pick file, preview, then confirm. Nothing is wiped
+    // until the user taps Restore in the dialog below.
+    var pendingRestore by remember { mutableStateOf<BackupHelper.BackupData?>(null) }
+
+    suspend fun performRestore(backup: BackupHelper.BackupData) {
+        var insertedTx = 0
+        var skippedTx = 0
+        var scheduleNote = ""
+        try {
+            val db = database ?: throw IllegalStateException("Database unavailable")
+            db.withTransaction {
+                // Full replace: wipe existing data
+                db.debtDao().deleteAll()
+                db.transactionDao().deleteAll()
+                try { db.templateDao().deleteAll() } catch (_: Exception) {}
+                val idMap = mutableMapOf<Long, Long>()
+                for (d in backup.debts) {
+                    idMap[d.id] = db.debtDao().insert(d.copy(id = 0))
+                }
+                for (t in backup.txs) {
+                    // P2: no old-id fallback — an unmapped debtId means the debt is
+                    // absent from this file; attaching it to a coincidental rowid
+                    // would corrupt someone else's ledger.
+                    val mapped = idMap[t.debtId]
+                    if (mapped == null || db.debtDao().getById(mapped) == null) { skippedTx++; continue }
+                    db.transactionDao().insert(t.copy(id = 0, debtId = mapped))
+                    insertedTx++
+                }
+                for (tpl in backup.templates) {
+                    try { db.templateDao().insert(tpl.copy(id = 0)) } catch (_: Exception) {}
+                }
+                // P1: the ledger is truth — recompute every balance from its own
+                // transactions so a stale/inflated stored balance can never be restored.
+                val now = System.currentTimeMillis()
+                for ((_, newId) in idMap) {
+                    var principal = 0.0
+                    var paid = 0.0
+                    for (r in db.transactionDao().getAllForDebtOnce(newId)) {
+                        if (r.direction == "debt_added") principal += r.amount
+                        else if (r.direction == "payment_received" || r.direction == "payment_made") paid += r.amount
+                    }
+                    val remaining = maxOf(principal - paid, 0.0)
+                    val debt = db.debtDao().getById(newId) ?: continue
+                    db.debtDao().update(debt.copy(
+                        principalAmount = principal,
+                        remainingBalance = remaining,
+                        isClosed = remaining <= com.dena.data.DebtRepository.CLOSE_EPSILON,
+                        updatedAt = now,
+                    ))
+                }
+            }
+            backup.preferences?.let { BackupHelper.applyPreferences(context, it, backup.hadTemplates) }
+            // P5: a schedule without a folder would no-op forever — reset it loudly.
+            if (prefs.getBackupSchedule() != DenaPreferences.SCHEDULE_DISABLED && prefs.getBackupDirUri().isBlank()) {
+                prefs.setBackupSchedule(DenaPreferences.SCHEDULE_DISABLED)
+                scheduleNote = " (auto-backup turned off — no folder on this device)"
+            }
+            // Re-schedule backup worker if schedule was restored
+            try { com.dena.core.BackupWorker.schedule(context) } catch (_: Exception) {}
+            withContext(Dispatchers.Main) { backupSchedule = prefs.getBackupSchedule() }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            return
+        }
+        withContext(Dispatchers.Main) {
+            val tplCount = backup.templates.size
+            val prefNote = if (backup.preferences != null) " + settings" else ""
+            val skipNote = if (skippedTx > 0) " ($skippedTx skipped: no matching debt)" else ""
+            Toast.makeText(context, "Restored ${backup.debts.size} debts, $insertedTx payments$skipNote, $tplCount templates$prefNote$scheduleNote — restart app", Toast.LENGTH_LONG).show()
+        }
+    }
+
     val importLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
@@ -701,46 +958,23 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
                         withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_LONG).show() }
                         return@launch
                     }
+                    // P11: reject non-Dena / future-version files with a specific message.
+                    val err = BackupHelper.parseError(decoded)
+                    if (err != null) {
+                        val msg = when {
+                            err == "not_json" || err == "not_dena_backup" -> "Not a Dena backup file"
+                            err.startsWith("unsupported_version") -> "Backup needs a newer Dena (v${err.substringAfter(':')})"
+                            else -> "Invalid backup file"
+                        }
+                        withContext(Dispatchers.Main) { Toast.makeText(context, msg, Toast.LENGTH_LONG).show() }
+                        return@launch
+                    }
                     val backup = BackupHelper.parseBackup(decoded)
                     if (backup == null) {
                         withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: invalid format", Toast.LENGTH_LONG).show() }
                         return@launch
                     }
-                    var importError: String? = null
-                    try {
-                        val db = database ?: throw IllegalStateException("Database unavailable")
-                        db.withTransaction {
-                            // Full replace: wipe existing data
-                            db.debtDao().deleteAll()
-                            db.transactionDao().deleteAll()
-                            try { db.templateDao().deleteAll() } catch (_: Exception) {}
-                            val idMap = mutableMapOf<Long, Long>()
-                            for (d in backup.debts) {
-                                val newId = db.debtDao().insert(d.copy(id = 0))
-                                idMap[d.id] = newId
-                            }
-                            for (t in backup.txs) {
-                                val mapped = idMap[t.debtId] ?: t.debtId
-                                if (db.debtDao().getById(mapped) == null) continue
-                                db.transactionDao().insert(t.copy(id = 0, debtId = mapped))
-                            }
-                            for (tpl in backup.templates) {
-                                try { db.templateDao().insert(tpl.copy(id = 0)) } catch (_: Exception) {}
-                            }
-                        }
-                        backup.preferences?.let { BackupHelper.applyPreferences(context, it) }
-                        // Re-schedule backup worker if schedule was restored
-                        try { com.dena.core.BackupWorker.schedule(context) } catch (_: Exception) {}
-                        withContext(Dispatchers.Main) { backupSchedule = prefs.getBackupSchedule() }
-                    } catch (e: Exception) { importError = e.message }
-                    withContext(Dispatchers.Main) {
-                        if (importError != null) Toast.makeText(context, "Import failed: $importError", Toast.LENGTH_LONG).show()
-                        else {
-                            val tplCount = backup.templates.size
-                            val prefNote = if (backup.preferences != null) " + settings" else ""
-                            Toast.makeText(context, "Restored ${backup.debts.size} debts, ${backup.txs.size} payments, $tplCount templates$prefNote — restart app", Toast.LENGTH_LONG).show()
-                        }
-                    }
+                    withContext(Dispatchers.Main) { pendingRestore = backup }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
                 }
@@ -775,17 +1009,24 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
         }
         scope.launch(Dispatchers.IO) {
             try {
-                val debts = database?.debtDao()?.getAllOnce() ?: emptyList()
-                val txs = database?.transactionDao()?.getAllOnce() ?: emptyList()
-                val templates = try { database?.templateDao()?.getAllOnce() ?: emptyList() } catch (_: Exception) { emptyList() }
+                // P7: single read transaction — see exportLauncher.
+                val db = database
+                val (debts, txs, templates) = if (db != null) db.withTransaction {
+                    Triple(
+                        db.debtDao().getAllOnce(),
+                        db.transactionDao().getAllOnce(),
+                        try { db.templateDao().getAllOnce() } catch (_: Exception) { emptyList() },
+                    )
+                } else Triple(emptyList(), emptyList(), emptyList())
                 val prefsSnap = BackupHelper.capturePreferences(context)
                 val json = BackupHelper.exportProfileToJson(debts, txs, templates, prefsSnap)
                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date())
                 val fileName = "dena-backup-$today.json"
                 val treeUri = android.net.Uri.parse(backupDirUri)
                 val dir = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
-                var file = dir?.findFile(fileName)
-                if (file == null) file = dir?.createFile("application/json", fileName)
+                if (dir != null) BackupHelper.pruneOldBackups(dir, fileName)
+                dir?.findFile(fileName)?.delete()
+                val file = dir?.createFile("application/json", fileName)
                 context.contentResolver.openOutputStream(file!!.uri, "w")?.use { it.write(json.toByteArray()) }
                 prefs.setLastBackupTime(System.currentTimeMillis())
                 withContext(Dispatchers.Main) { Toast.makeText(context, "Backup saved as $fileName", Toast.LENGTH_LONG).show() }
@@ -793,6 +1034,35 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
                 withContext(Dispatchers.Main) { Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show() }
             }
         }
+    }
+
+    // P6: confirm-before-wipe dialog with a preview of the staged backup.
+    pendingRestore?.let { staged ->
+        val srcDate = if (staged.exportedAt > 0L)
+            SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.US).format(java.util.Date(staged.exportedAt))
+        else "unknown date"
+        AlertDialog(
+            onDismissRequest = { pendingRestore = null },
+            title = { Text("Restore backup?") },
+            text = {
+                Text(
+                    "This REPLACES everything on this device with the backup from $srcDate:\n\n" +
+                        "• ${staged.debts.size} debts\n" +
+                        "• ${staged.txs.size} payments\n" +
+                        "• ${staged.templates.size} templates" +
+                        (if (staged.preferences != null) "\n• App settings" else "") +
+                        "\n\nCurrent data will be erased. Balances are recomputed from the payment history on restore."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val r = staged
+                    pendingRestore = null
+                    scope.launch(Dispatchers.IO) { performRestore(r) }
+                }) { Text("Restore") }
+            },
+            dismissButton = { TextButton(onClick = { pendingRestore = null }) { Text("Cancel") } },
+        )
     }
 
     SettingsSubpageScaffold(title = "Data and storage", onBack = onBack) {
@@ -833,7 +1103,7 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
                             ) { Text("Restore", fontWeight = FontWeight.Medium) }
                         }
                         Text(
-                            text = "Backups save as dena-backup.json containing debts, templates, and settings.",
+                            text = "One rolling backup (dena-backup-date.json) with debts, templates, and settings — updated in place on every backup.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -890,120 +1160,6 @@ fun BackupSubpage(database: DenaDatabase?, onBack: () -> Unit) {
             },
             confirmButton = { TextButton(onClick = { showSchedulePicker = false }) { Text("Done") } },
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DataBackupBottomSheet(database: DenaDatabase?, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val contentResolver = context.contentResolver
-    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if (uri != null) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val debts = database?.debtDao()?.getAllOnce() ?: emptyList()
-                    val txs = database?.transactionDao()?.getAllOnce() ?: emptyList()
-                    val json = BackupHelper.exportProfileToJson(debts, txs)
-                    contentResolver.openOutputStream(uri)?.use { output -> output.write(json.toByteArray()) }
-                    val filename = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.json"
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Backup saved as $filename to your chosen location", Toast.LENGTH_LONG).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-        }
-    }
-    val importLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val content = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                    if (content == null) {
-                        withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_LONG).show() }
-                        return@launch
-                    }
-                    val decoded = BackupHelper.decodeBackupString(content)
-                    if (decoded == null) {
-                        withContext(Dispatchers.Main) { Toast.makeText(context, "Invalid backup file", Toast.LENGTH_LONG).show() }
-                        return@launch
-                    }
-                    val debts = mutableListOf<com.dena.data.debt.Debt>()
-                    val txs = mutableListOf<com.dena.data.transaction.Transaction>()
-                    var importError: String? = null
-                    val ok = BackupHelper.importProfileFromString(decoded, { d -> debts.addAll(d) }, { t -> txs.addAll(t) })
-                    if (!ok) {
-                        withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: invalid backup format", Toast.LENGTH_LONG).show() }
-                        return@launch
-                    }
-                    try {
-                        val db = database ?: throw IllegalStateException("Database unavailable")
-                        db.withTransaction {
-                            val existing = db.debtDao().getAllOnce()
-                            val existingKeys = existing.map { "${it.contactName}|${it.direction}|${it.principalAmount}|${it.creationDate}" }.toSet()
-                            val idMap = mutableMapOf<Long, Long>()
-                            for (d in debts) {
-                                val key = "${d.contactName}|${d.direction}|${d.principalAmount}|${d.creationDate}"
-                                if (key in existingKeys) {
-                                    val match = existing.first { "${it.contactName}|${it.direction}|${it.principalAmount}|${it.creationDate}" == key }
-                                    idMap[d.id] = match.id
-                                } else {
-                                    val newId = db.debtDao().insert(d.copy(id = 0))
-                                    idMap[d.id] = newId
-                                }
-                            }
-                            for (t in txs) {
-                                val mappedDebtId = idMap[t.debtId] ?: t.debtId
-                                // skip if debt not found after mapping
-                                if (db.debtDao().getById(mappedDebtId) == null) continue
-                                db.transactionDao().insert(t.copy(id = 0, debtId = mappedDebtId))
-                            }
-                        }
-                    } catch (e: Exception) {
-                        importError = e.message
-                    }
-                    withContext(Dispatchers.Main) {
-                        if (importError != null) Toast.makeText(context, "Import failed: $importError", Toast.LENGTH_LONG).show()
-                        else Toast.makeText(context, "Restored ${debts.size} debts & ${txs.size} transactions — restart app", Toast.LENGTH_LONG).show()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) { Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
-                }
-            }
-        }
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Backup & Restore", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = "Saves and restores all debts, transactions, and settings as a JSON file.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Button(
-                onClick = {
-                    val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-                    exportLauncher.launch("dena-backup-$today.json")
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("Export Backup", fontWeight = FontWeight.SemiBold) }
-            OutlinedButton(
-                onClick = { importLauncher.launch(arrayOf("*/*")) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("Restore Backup", fontWeight = FontWeight.Medium) }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
     }
 }
 
